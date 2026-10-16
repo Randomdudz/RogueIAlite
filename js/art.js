@@ -270,5 +270,51 @@
     return e.ok ? e.img : null;
   }
 
-  NX.art = { SHAPES, sprite, PAL, RENDER_R, SPR, imgFor, circ, rr, leg, R: RENDER_R };
+  /* ============================================================
+     OVERLAY ÉCRAN CRT — dessiné en dernière couche par le renderer
+     (scanlines animées, vignette renforcée, reflet d'écran)
+     ============================================================ */
+  function crt(ctx, w, h, t) {
+    ctx.save();
+    // scanlines fines qui défilent
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = '#000';
+    const line = 3, gap = 2;
+    for (let y = (t * 90) % (line + gap); y < h; y += line + gap) {
+      ctx.fillRect(0, y, w, line);
+    }
+    ctx.restore();
+    // vignette renforcée + bords assombris
+    const g = ctx.createRadialGradient(w / 2, h / 2, w * 0.22, w / 2, h / 2, w * 0.9);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.5, 'rgba(8,12,22,0.30)');
+    g.addColorStop(1, 'rgba(2,4,8,0.92)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // reflet d'écran en haut (très subtil)
+    const rg = ctx.createLinearGradient(0, 0, 0, h * 0.12);
+    rg.addColorStop(0, 'rgba(255,255,255,0.03)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, w, h * 0.12);
+    ctx.globalAlpha = 1;
+  }
+
+  /* ============================================================
+     GRILLE SYNTHWAVE ANIMÉE — fonds d'écran UI / cinématiques
+     ============================================================ */
+  function grid(ctx, w, h, t, col) {
+    ctx.save();
+    ctx.strokeStyle = col || '#39e6ff';
+    ctx.lineWidth = 1; ctx.globalAlpha = 0.14;
+    const cell = 40, ox = (t * 24) % cell, oy = (t * 12) % cell;
+    ctx.beginPath();
+    for (let x = ox; x < w; x += cell) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+    for (let y = oy; y < h; y += cell) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    ctx.stroke();
+    // ligne d'horizon
+    ctx.globalAlpha = 0.30;
+    ctx.beginPath(); ctx.moveTo(0, h * 0.60); ctx.lineTo(w, h * 0.60); ctx.stroke();
+    ctx.restore();
+  }
+
+  NX.art = { SHAPES, sprite, PAL, RENDER_R, SPR, imgFor, circ, rr, leg, R: RENDER_R, crt, grid };
 })();

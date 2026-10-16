@@ -39,6 +39,20 @@
     for (let x = ox % cell; x < W; x += cell) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
     for (let y = oy % cell; y < H; y += cell) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
     ctx.stroke();
+    // noeuds de circuit qui scintillent aux intersections de grille
+    ctx.fillStyle = M.rgba(env.accent, 0.9);
+    for (let x = ox % cell; x < W; x += cell * 2) {
+      for (let y = oy % cell; y < H; y += cell * 2) {
+        const pulse = 0.4 + 0.6 * Math.abs(Math.sin((run.time + (x + y) * 0.01) * 3));
+        if (pulse > 0.7) { ctx.globalAlpha = pulse * 0.5; ctx.fillRect(x - 1.5, y - 1.5, 3, 3); }
+      }
+    }
+    ctx.globalAlpha = 1;
+    // scan vertical qui descend (effet écran de données)
+    const scan = (run.time * 55) % (H + 90) - 45;
+    const sg = ctx.createLinearGradient(0, scan, 0, scan + 90);
+    sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(0.5, M.rgba(env.accent, 0.10)); sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg; ctx.fillRect(0, scan, W, 90);
     // halo central
     const rg = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, 620);
     rg.addColorStop(0, M.rgba(env.accent, 0.05)); rg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -75,8 +89,17 @@
       const k = r / ART.RENDER_R;
       const dw = ART.SPR * k, dh = ART.SPR * k;
       ctx.drawImage(sp.canvas, s.x - dw / 2, s.y - dh / 2 - r * 0.15, dw, dh);
+      /* bloom néon : on redessine le sprite plus grand, en additif, pour
+         simuler une lueur sans blur gaussien (coûteux en Canvas 2D) */
+      if (glow) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.30;
+        const g = 1.4;
+        ctx.drawImage(sp.canvas, s.x - dw * g / 2, s.y - dh * g / 2 - r * 0.15, dw * g, dh * g);
+        ctx.restore();
+      }
     }
-    if (glow) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25; ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(s.x, s.y, r * 1.5, 0, TAU); ctx.fill(); ctx.restore(); }
     if (flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = flash * 3; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill(); ctx.restore(); }
     return s;
   }
@@ -122,11 +145,18 @@
   function drawGround(run) {
     run.zones.forEach(z => {
       const s = toScreen(z.x, z.y);
-      ctx.save(); ctx.globalAlpha = 0.25 + 0.1 * Math.sin(z.t * 6);
-      ctx.fillStyle = z.hostile ? '#ff5d6c' : (z.color || '#ff9a55');
+      const col = z.hostile ? '#ff5d6c' : (z.color || '#ff9a55');
+      const a = 0.25 + 0.12 * Math.sin(z.t * 6);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(s.x, s.y, z.r, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.6; ctx.strokeStyle = z.hostile ? '#ff5d6c' : (z.color || '#ff9a55'); ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(s.x, s.y, z.r * (0.6 + 0.4 * ((z.t * 2) % 1)), 0, TAU); ctx.stroke(); ctx.restore();
+      // bloom des zones hostiles
+      if (z.hostile) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25;
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(s.x, s.y, z.r * 1.35, 0, TAU); ctx.fill(); ctx.restore();
+      }
     });
     run.fields.forEach(f => {
       const s = toScreen(f.x, f.y);
@@ -223,16 +253,18 @@
     if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) { /* clignote */ }
     // halo holographique (repère visuel permanent)
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const hg = ctx.createRadialGradient(s.x, s.y, 4, s.x, s.y, 46);
-    hg.addColorStop(0, 'rgba(57,230,255,0.5)'); hg.addColorStop(1, 'rgba(57,230,255,0)');
-    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(s.x, s.y, 46, 0, TAU); ctx.fill();
+    const pulse = 0.45 + 0.25 * Math.abs(Math.sin(run.time * 4));
+    const hg = ctx.createRadialGradient(s.x, s.y, 4, s.x, s.y, 52);
+    hg.addColorStop(0, 'rgba(57,230,255,' + (0.45 + pulse * 0.3) + ')');
+    hg.addColorStop(1, 'rgba(57,230,255,0)');
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(s.x, s.y, 52, 0, TAU); ctx.fill();
     // anneau au sol
     ctx.globalAlpha = 0.5; ctx.strokeStyle = '#39e6ff'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(s.x, s.y + 14, 16, 6, 0, 0, TAU); ctx.stroke();
     ctx.restore();
     ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(s.x, s.y + 15, 14, 5, 0, 0, TAU); ctx.fill(); ctx.restore();
     const frame = Math.floor(p.anim * 8) % 8;
-    drawSprite({ x: p.x, y: p.y, r: p.r, id: 'raz' }, 'raz', '#7ff0ff', '#39e6ff', frame, 1, p.hitFlash > 0 ? 0.6 : 0, null);
+    drawSprite({ x: p.x, y: p.y, r: p.r, id: 'raz' }, 'raz', '#7ff0ff', '#39e6ff', frame, 1, p.hitFlash > 0 ? 0.6 : 0, true);
     if (p.stunT > 0) { ctx.save(); ctx.globalAlpha = 0.8; ctx.fillStyle = '#ccd6e0'; ctx.font = '16px sans-serif'; ctx.fillText('⛔', s.x - 8, s.y - 40); ctx.restore(); }
   }
 
@@ -313,6 +345,9 @@
       drawPlayer(run);
       drawFx();
       vignette();
+      // overlay écran CRT (dernière couche, par-dessus tout le jeu)
+      if (NX.profile.d.settings.shake !== undefined) { /* shake déjà géré */ }
+      ART.crt(ctx, W, H, run ? run.time : 0);
     },
     toScreen
   };
