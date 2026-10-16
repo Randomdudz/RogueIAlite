@@ -35,16 +35,16 @@
   }
 
   /* ACTE I — mise en route douce (niveaux courts, ennemis simples) */
-  lvl(1, 1, ['agent', 'stagiaire', 'moderateur', 'livreur', 'paquet'], 'b_chef', 240);
-  lvl(1, 2, ['agent', 'stagiaire', 'moderateur', 'livreur', 'aspi', 'bug'], 'b_mod', 270);
-  lvl(1, 3, ['stagiaire', 'commercial', 'livreur', 'aspi', 'routeur', 'bug', 'tondeuse'], 'b_auto', 300);
-  lvl(1, 4, ['commercial', 'comptable', 'livreur', 'automate', 'routeur', 'bug', 'captcha2', 'tondeuse'], 'b_arch', 330, { eliteChance: 0.08 });
+  lvl(1, 1, ['agent', 'stagiaire', 'moderateur', 'livreur', 'paquet'], 'b_chef', 180);
+  lvl(1, 2, ['agent', 'stagiaire', 'moderateur', 'livreur', 'aspi', 'bug'], 'b_mod', 200);
+  lvl(1, 3, ['stagiaire', 'commercial', 'livreur', 'aspi', 'comptable', 'bug', 'tondeuse'], 'b_auto', 220);
+  lvl(1, 4, ['commercial', 'comptable', 'livreur', 'automate', 'captcha2', 'bug', 'tondeuse', 'aspi'], 'b_arch', 240, { eliteChance: 0.08 });
 
   /* ACTE II */
-  lvl(2, 1, ['automate', 'brasseur', 'tondeuse', 'routeur', 'captcha2', 'bug', 'fuite'], 'b_parefeu', 360);
-  lvl(2, 2, ['brasseur', 'routeur', 'captcha2', 'parefeu2', 'bug', 'fuite', 'ransom'], 'b_ras', 390);
-  lvl(2, 3, ['brasseur', 'routeur', 'parefeu2', 'sentinelle', 'ransom', 'zeroday', 'tondeuse'], 'b_gpu', 420, { eliteChance: 0.1 });
-  lvl(2, 4, ['parefeu2', 'sentinelle', 'antivirus', 'ransom', 'zeroday', 'fuite', 'botnet2', 'comptable'], 'b_net', 450, { eliteChance: 0.12 });
+  lvl(2, 1, ['automate', 'brasseur', 'tondeuse', 'captcha2', 'bug', 'fuite', 'comptable'], 'b_parefeu', 280);
+  lvl(2, 2, ['brasseur', 'captcha2', 'parefeu2', 'bug', 'fuite', 'ransom', 'aspi'], 'b_ras', 300);
+  lvl(2, 3, ['brasseur', 'captcha2', 'parefeu2', 'sentinelle', 'ransom', 'zeroday', 'tondeuse', 'comptable'], 'b_gpu', 320, { eliteChance: 0.1 });
+  lvl(2, 4, ['parefeu2', 'sentinelle', 'antivirus', 'ransom', 'zeroday', 'fuite', 'botnet2', 'comptable'], 'b_net', 340, { eliteChance: 0.12 });
 
   /* ACTE III */
   lvl(3, 1, ['routeur', 'lac', 'serveur', 'antivirus', 'sentinelle', 'bug', 'botnet2'], 'b_av', 480);

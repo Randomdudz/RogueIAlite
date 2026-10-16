@@ -180,7 +180,7 @@
           h('div', { class: 'n' }, l.i),
           h('div', { class: 'meta' },
             h('div', { class: 'nm' }, (done ? '✔ ' : '') + NX.ACTS[l.act - 1].env.toUpperCase() + ' — ' + M.clock(l.dur)),
-            h('div', { class: 'd' }, 'Boss : ' + (l.boss ? NX.BOSSES[l.boss].n : 'MIRROIR') + ' · ' + (locked ? '🔒 verrouillé' : l.pool.length + ' types de monstres'))
+            h('div', { class: 'd' }, 'Boss : ' + (l.boss ? NX.BOSSES[l.boss].n : 'MIRROIR (final)') + ' · ' + (locked ? '🔒 verrouillé' : l.pool.length + ' types de monstres'))
           )
         ));
       });
@@ -257,31 +257,82 @@
       const allocSet = {};
       Object.assign(allocSet, P.d.talents.core); Object.assign(allocSet, P.d.talents.byClass[cls] || {});
       ctx.clearRect(0, 0, cv.width, cv.height);
-      ctx.fillStyle = '#070b12'; ctx.fillRect(0, 0, cv.width, cv.height);
-      // liens
+      const g = ctx.createLinearGradient(0, 0, cv.width, cv.height);
+      g.addColorStop(0, '#05080e'); g.addColorStop(1, '#0a0f18');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(57,230,255,0.06)'; ctx.lineWidth = 1;
+      const cell = 56, t = Date.now() * 0.0008;
+      const ox = ((t * 16) % cell), oy = ((t * 10) % cell);
+      ctx.beginPath();
+      for (let x = ox; x < cv.width; x += cell) { ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); }
+      for (let y = oy; y < cv.height; y += cell) { ctx.moveTo(0, y); ctx.lineTo(cv.width, y); }
+      ctx.stroke();
+      ctx.restore();
+      // liens entre nœuds (courbes légères)
       NX.TALENTS.all.forEach(id => {
         const n = nd[id];
         n.req.forEach(rq => {
           const a = W2S(n.pos), b = W2S(nd[rq].pos);
-          const on = allocSet[id];
-          ctx.strokeStyle = on ? '#39e6ff' : 'rgba(120,150,190,0.18)'; ctx.lineWidth = on ? 3 : 1.5;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          const on = allocSet[id] && allocSet[rq];
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          const dx = b.x - a.x, dy = b.y - a.y;
+          ctx.quadraticCurveTo(mx - dy * 0.14, my + dx * 0.14, b.x, b.y);
+          ctx.strokeStyle = on ? '#39e6ff' : 'rgba(120,150,190,0.14)';
+          ctx.lineWidth = on ? 4 : 2;
+          ctx.stroke();
         });
       });
       // nœuds
       NX.TALENTS.all.forEach(id => {
         const n = nd[id], p = W2S(n.pos);
         const owned = allocSet[id], can = P.canTake(cls, id);
-        const r = (n.kind === 'key' ? 15 : n.kind === 'notable' ? 11 : 8) * Math.max(0.6, Math.min(1.3, cam.z));
+        const baseR = (n.kind === 'key' ? 19 : n.kind === 'notable' ? 14 : 11) * Math.max(0.5, Math.min(1.5, cam.z));
         const col = n.cls === 'core' ? '#8fb8ff' : (NX.CLASSES[n.cls] ? NX.CLASSES[n.cls].col : (colorOfX(n.cls)));
-        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, M.TAU);
-        ctx.fillStyle = owned ? col : 'rgba(12,20,32,0.95)';
-        ctx.globalAlpha = owned ? 1 : (can ? 0.95 : 0.4);
+        // halo de nœud actif ou sélectionnable
+        if (owned || can) {
+          ctx.save();
+          ctx.shadowColor = col; ctx.shadowBlur = owned ? 20 : 12;
+          ctx.globalAlpha = owned ? 1 : 0.92;
+          ctx.beginPath(); ctx.arc(p.x, p.y, baseR + 8, 0, M.TAU);
+          ctx.fillStyle = M.rgba(col, 0.14); ctx.fill();
+          ctx.restore();
+        }
+        // anneau de sélection
+        if (sel === id) {
+          ctx.beginPath(); ctx.arc(p.x, p.y, baseR + 11, 0, M.TAU);
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.9; ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        // corps du nœud
+        ctx.beginPath(); ctx.arc(p.x, p.y, baseR, 0, M.TAU);
+        ctx.fillStyle = owned ? col : 'rgba(10,17,28,0.94)';
+        ctx.globalAlpha = owned ? 1 : (can ? 0.97 : 0.32);
         ctx.fill(); ctx.globalAlpha = 1;
-        ctx.strokeStyle = owned ? '#fff' : (can ? col : 'rgba(90,110,140,0.6)');
-        ctx.lineWidth = owned ? 2.5 : 2; ctx.stroke();
-        if (n.kind === 'key') { ctx.fillStyle = owned ? '#000' : col; ctx.font = 'bold ' + (r * 1.1) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', p.x, p.y + 1); }
-        if (sel === id) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, r + 5, 0, M.TAU); ctx.stroke(); }
+        ctx.strokeStyle = owned ? '#ffffff' : (can ? col : 'rgba(90,110,140,0.55)');
+        ctx.lineWidth = owned ? 3.5 : (can ? 3 : 2); ctx.stroke();
+        // icône au centre (émoji) ou ★ pour les clés sans icône
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (n.ic) {
+          ctx.font = (baseR * 1.45) + 'px sans-serif';
+          ctx.fillStyle = owned ? '#fff' : '#eaf3ff';
+          ctx.fillText(n.ic, p.x, p.y + baseR * 0.06);
+        } else if (n.kind === 'key') {
+          ctx.font = 'bold ' + (baseR * 1.25) + 'px sans-serif';
+          ctx.fillStyle = owned ? '#000' : col;
+          ctx.fillText('★', p.x, p.y + baseR * 0.06);
+        }
+        // petit badge coût en bas à droite du nœud
+        const cr = baseR * 0.5;
+        ctx.beginPath(); ctx.arc(p.x + baseR - cr, p.y + baseR - cr, cr, 0, M.TAU);
+        ctx.fillStyle = owned ? 'rgba(255,255,255,0.15)' : (can ? '#ffd479' : 'rgba(90,110,140,0.45)');
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.font = (cr * 1.1) + 'px Consolas, monospace';
+        ctx.fillStyle = owned ? '#8fa3bd' : (can ? '#1a1a1a' : 'rgba(255,255,255,0.6)');
+        ctx.fillText(n.cost, p.x + baseR - cr, p.y + baseR - cr + cr * 0.32);
       });
     }
     function colorOfX(sc) { return sc.startsWith('x') ? '#c48bff' : '#8aa0b8'; }

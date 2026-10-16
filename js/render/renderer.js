@@ -191,12 +191,48 @@
   function drawProjectiles(run) {
     run.projs.forEach(p => {
       const s = toScreen(p.x, p.y);
-      const col = NX.DMSG[p.dmgType] ? NX.DMSG[p.dmgType].c : '#fff';
-      if (p.beam) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = col; ctx.lineWidth = p.size; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.moveTo(s.x - p.vx * 0.02, s.y - p.vy * 0.02); ctx.lineTo(s.x + p.vx * 0.03, s.y + p.vy * 0.03); ctx.stroke(); ctx.restore(); return; }
+      const dmg = NX.DMSG[p.dmgType] || NX.DMSG.kinetic;
+      const col = dmg.c;
+      // traînée pour les projectiles rapides
+      if (Math.hypot(p.vx, p.vy) > 260) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = col; ctx.lineWidth = p.size * 0.5; ctx.globalAlpha = 0.35;
+        ctx.beginPath(); ctx.moveTo(s.x - p.vx * 0.06, s.y - p.vy * 0.06); ctx.lineTo(s.x, s.y); ctx.stroke();
+        ctx.restore();
+      }
+      if (p.beam) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = col; ctx.lineWidth = p.size; ctx.globalAlpha = 0.9;
+        ctx.beginPath(); ctx.moveTo(s.x - p.vx * 0.02, s.y - p.vy * 0.02); ctx.lineTo(s.x + p.vx * 0.03, s.y + p.vy * 0.03); ctx.stroke(); ctx.restore(); return;
+      }
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.9, 0, TAU); ctx.fill();
+      // forme selon le type de dégâts
+      if (p.dmgType === 'pierce') {
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(p.vy, p.vx));
+        ctx.beginPath(); ctx.moveTo(-p.size * 0.6, -p.size * 0.5); ctx.lineTo(p.size * 0.9, 0); ctx.lineTo(-p.size * 0.6, p.size * 0.5); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (p.dmgType === 'thermal') {
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.6, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 1.4, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+      } else if (p.dmgType === 'emp') {
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 1.1, 0, TAU); ctx.stroke();
+      } else if (p.dmgType === 'corrosion') {
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.55, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#0a111c'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.55, 0, TAU); ctx.stroke();
+      } else if (p.dmgType === 'void') {
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16;
+        ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 0.5; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.9, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+      } else {
+        // kinetic : disque métallique
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.stroke();
+      }
       ctx.restore();
     });
     run.eshots.forEach(p => {
@@ -217,19 +253,31 @@
       const col = NX.DMSG[res.dmgType] ? NX.DMSG[res.dmgType].c : '#8bff6b';
       if (def.mode === 'aura') {
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        const pulse = 0.12 + 0.05 * Math.sin(run.time * 5);
-        const g = ctx.createRadialGradient(ps.x, ps.y, res.size * 0.3, ps.x, ps.y, res.size);
-        g.addColorStop(0, M.rgba(col, 0.02)); g.addColorStop(1, M.rgba(col, pulse));
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ps.x, ps.y, res.size, 0, TAU); ctx.fill();
-        ctx.strokeStyle = M.rgba(col, 0.35); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ps.x, ps.y, res.size, 0, TAU); ctx.stroke(); ctx.restore();
+        const pulse = 0.5 + 0.5 * Math.sin(run.time * 4);
+        // anneaux concentriques qui pulsent
+        for (let i = 0; i < 3; i++) {
+          const r = res.size * (0.5 + i * 0.25);
+          const a = 0.06 + (pulse * 0.08) * (1 - i * 0.3);
+          const g = ctx.createRadialGradient(ps.x, ps.y, r * 0.4, ps.x, ps.y, r);
+          g.addColorStop(0, M.rgba(col, 0.04)); g.addColorStop(1, M.rgba(col, 0));
+          ctx.fillStyle = g; ctx.globalAlpha = a;
+          ctx.beginPath(); ctx.arc(ps.x, ps.y, r, 0, TAU); ctx.fill();
+        }
+        ctx.strokeStyle = M.rgba(col, 0.4 + pulse * 0.3); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(ps.x, ps.y, res.size, 0, TAU); ctx.stroke(); ctx.restore();
       } else if (def.mode === 'orbit') {
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         for (let k = 0; k < res.count; k++) {
           const a = w.ang + k * TAU / res.count;
           const ox = ps.x + Math.cos(a) * res.range, oy = ps.y + Math.sin(a) * res.range;
-          ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12;
-          ctx.beginPath(); ctx.arc(ox, oy, res.size * 0.5, 0, TAU); ctx.fill();
-          ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(ox, oy, res.size, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+          // traînée orbitale
+          ctx.beginPath(); ctx.arc(ps.x, ps.y, res.range, 0, TAU);
+          ctx.strokeStyle = M.rgba(col, 0.08); ctx.lineWidth = 1; ctx.stroke();
+          // orbe avec halo
+          ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 14;
+          ctx.beginPath(); ctx.arc(ox, oy, res.size * 0.6, 0, TAU); ctx.fill();
+          ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(ox, oy, res.size, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox, oy, res.size * 0.35, 0, TAU); ctx.stroke();
         }
         ctx.restore();
       }
