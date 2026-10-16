@@ -83,3 +83,4 @@ procédural (voir `art.overrideFor(id)`). Les icônes d'UI sont des SVG inline/C
 - [x] 3 fins + 1 fin secrète
 - [x] Comptes en ligne (local / serveur / Firebase) + leaderboard
 - [ ] Assets PNG finaux (à fournir/remplacer) — le loader est prêt
+"# RogueIAlite" 
