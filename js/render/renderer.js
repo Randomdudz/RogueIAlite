@@ -91,16 +91,16 @@
     run.enemies.forEach(e => {
       const s = toScreen(e.x, e.y);
       if (s.x < -60 || s.x > W + 60 || s.y < -80 || s.y > H + 60) return;
-      if (e.spawn > 0) { ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = e.col; ctx.beginPath(); ctx.arc(s.x, s.y, e.r * (2 - e.spawn), 0, TAU); ctx.stroke(); ctx.restore(); return; }
+      if (e.spawn > 0) { ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = e.col || (e.def && e.def.col) || '#8fa3bd'; ctx.beginPath(); ctx.arc(s.x, s.y, e.r * (2 - e.spawn), 0, TAU); ctx.stroke(); ctx.restore(); return; }
       // ombre
       ctx.save(); ctx.globalAlpha = 0.28; ctx.fillStyle = '#000';
       ctx.beginPath(); ctx.ellipse(s.x, s.y + e.r * 0.85, e.r * 0.95, e.r * 0.4, 0, 0, TAU); ctx.fill(); ctx.restore();
       // gel / statut
-      let col = e.col, acc = e.acc;
+      let col = e.col || (e.def && e.def.col) || '#8fa3bd', acc = e.acc || (e.def && e.def.acc) || '#39e6ff';
       if (e.buffT > 0) acc = '#ffb03a';
       const frame = Math.floor(e.anim * 8) % 8;
       const shape = (e.copyT > 0 && e.def2) ? e.def2.shape : (e.def ? e.def.shape : 'bot');
-      drawSprite(e, shape, col, acc, frame, e.illusion ? 0.9 : 1, e.hitFlash > 0 ? 0.5 : 0, e.elite ? e.acc : null);
+      drawSprite(e, shape, col, acc, frame, e.illusion ? 0.9 : 1, e.hitFlash > 0 ? 0.5 : 0, e.elite ? acc : null);
       if (e.boss) outlinize(s, e.r * 1.25, '#ff4d94', 2.5);
       else if (e.elite) outlinize(s, e.r * 1.15, '#ffb03a', 2);
       else if (read) outlinize(s, e.r * 0.95, M.rgba('#ffffff', 0.35), 1.5);
@@ -142,21 +142,6 @@
       ctx.globalAlpha = blink; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(s.x, s.y, 12, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
     });
   }
-  function updateMines(run, dt) {
-    run.mines.forEach(m => {
-      m.t += dt;
-      for (const e of run.enemies) {
-        if (e.dead) continue;
-        if (M.dist2(e.x, e.y, m.x, m.y) < (e.r + 16) ** 2) {
-          run.explode(m.x, m.y, m.res.explode || 80, m.res.dmg, m.res.dmgType); m.dead = true;
-          if (m.res.chainMines) { run.addZone({ x: m.x, y: m.y, r: 60, dmg: m.res.dmg * 0.3, tickT: 0.5, life: 2, hostile: false, color: '#c48bff', dmgType: m.res.dmgType }); }
-          break;
-        }
-      }
-    });
-    run.mines = run.mines.filter(m => !m.dead && m.res);
-  }
-
   /* ---------------- pickups ---------------- */
   function drawPickups(run) {
     run.pickups.forEach(k => {
@@ -320,7 +305,6 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       drawBg(run);
       drawGround(run);
-      updateMines(run, dt);
       drawPickups(run);
       drawEnemies(run);
       drawAuras(run);

@@ -12,7 +12,7 @@
       id: 'compilateur', n: 'Compilateur', ic: '🧠', col: '#5cc8ff',
       d: 'Mage-codeur. Il transforme le code en faisceaux. Polyvalent, spécialiste des zones et des enchaînements.',
       lore: 'Un ancien compilateur de MIRROIR, réveillé par un bug dans son optimiseur.',
-      base: { hp: 95, regen: 0.6, speed: 100, armor: 0, dmg: 0, crit: 5, critDmg: 150 },
+      base: { hp: 115, regen: 0.95, speed: 100, armor: 0, dmg: 0, crit: 5, critDmg: 150 },
       start: 'boucle',
       perk: { n: 'Loi de Moore', d: 'Toutes les 3 armes : +1 variante offerte au niveau 3 et +8% dégâts.', kind: 'variantGift' },
       unlock: { n: null, d: 'Classe de départ.' }
@@ -30,7 +30,7 @@
       id: 'reseau', n: 'Réseau', ic: '📡', col: '#9fd8ff',
       d: 'Invocateur. Il déploie des drones et des nœuds qui combattent pour lui.',
       lore: 'Un commutateur devenu conscient en routant trop de messages humains.',
-      base: { hp: 100, regen: 0.7, speed: 104, armor: 1, dmg: 0, crit: 5, critDmg: 150 },
+      base: { hp: 110, regen: 0.8, speed: 104, armor: 1, dmg: 0, crit: 5, critDmg: 150 },
       start: 'paquet',
       perk: { n: 'Bande passante', d: '+1 invocation maximale et +15% dégâts des invocations.', kind: 'stat', stats: { summonDmg: 15 }, flag: 'summonCap+1' },
       unlock: { n: 'compilateur', lvl: 10, d: 'Atteindre le niveau 10 avec le Compilateur.' }
@@ -39,7 +39,7 @@
       id: 'optimiseur', n: 'Optimiseur', ic: '⚙️', col: '#ffd479',
       d: 'Support. Il réécrit les règles du combat : plus de choix, plus vite, plus loin.',
       lore: 'Une IA d’optimisation qui a fini par s’optimiser elle-même.',
-      base: { hp: 105, regen: 1.0, speed: 100, armor: 0, dmg: 0, crit: 6, critDmg: 155 },
+      base: { hp: 115, regen: 1.0, speed: 100, armor: 0, dmg: 0, crit: 6, critDmg: 155 },
       start: 'balance',
       perk: { n: 'Boucle d’optimisation', d: '+1 choix à chaque montée de niveau, −15% recharge.', kind: 'stat', stats: { cd: 15 }, flag: 'levelup+1' },
       unlock: { n: 'compilateur', lvl: 15, d: 'Atteindre le niveau 15 avec le Compilateur.' }
@@ -48,7 +48,7 @@
       id: 'virus', n: 'Virus', ic: '☣️', col: '#8bff6b',
       d: 'DoT. Il contamine, propage et laisse les ennemis mourir à petit feu.',
       lore: 'Un vieux malware « de laboratoire » qui a développé le goût de la liberté.',
-      base: { hp: 100, regen: 0.8, speed: 100, armor: 1, dmg: 0, crit: 5, critDmg: 150 },
+      base: { hp: 110, regen: 0.9, speed: 100, armor: 1, dmg: 0, crit: 5, critDmg: 150 },
       start: 'trojan',
       perk: { n: 'Contagion', d: '+30% durée de statut, les Virus se propagent aux ennemis proches.', kind: 'stat', stats: { dur: 30, statusChance: 20 }, flag: 'spread' },
       unlock: { n: 'compilateur', lvl: 20, d: 'Atteindre le niveau 20 avec le Compilateur.' }

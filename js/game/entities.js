@@ -30,7 +30,7 @@
     const hpMul = (mods.hp || 1) * eliteMul;
     const dmgMul = (mods.dmg || 1) * (opts.elite ? 1.35 : 1);
     const e = {
-      kind: 'enemy', def: d, id: defId, x, y, vx: 0, vy: 0, r: d.r * (opts.elite ? 1.25 : 1),
+      kind: 'enemy', def: d, id: defId, col: d.col, acc: d.acc, x, y, vx: 0, vy: 0, r: d.r * (opts.elite ? 1.25 : 1),
       hp: d.hp * hpMul, maxHp: d.hp * hpMul, speed: d.speed * (opts.elite ? 0.92 : 1), dmg: d.dmg * dmgMul,
       xp: d.xp * (opts.elite ? 4 : 1), elite: !!opts.elite, boss: false,
       beh: d.beh, bt: {}, atk: {}, st: {}, status: {}, shield: 0, shieldMax: 0,
@@ -46,7 +46,7 @@
     const d = NX.BOSSES[defId]; if (!d) return null;
     const hpMul = (mods.hp || 1);
     const e = {
-      kind: 'enemy', def: d, id: defId, x, y, vx: 0, vy: 0, r: d.r,
+      kind: 'enemy', def: d, id: defId, col: d.col, acc: d.acc, x, y, vx: 0, vy: 0, r: d.r,
       hp: d.hp * hpMul, maxHp: d.hp * hpMul, speed: d.speed, dmg: d.dmg * (mods.dmg || 1),
       xp: d.xp, elite: true, boss: true, name: d.n,
       beh: (d.phases[0] || {}).beh || d.beh, bt: {}, atk: {}, st: {}, status: {}, shield: 0, shieldMax: 0,

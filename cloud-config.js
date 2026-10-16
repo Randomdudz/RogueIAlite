@@ -11,5 +11,9 @@ window.NX_CLOUD = {
   url: '',                       // pour backend 'server' : ex. 'http://localhost:8787'
   apiKey: '',                    // pour backend 'firebase'
   projectId: '',                 // pour backend 'firebase'
-  game: 'nexus-reveil'           // identifiant du jeu (isolation des données)
+  game: 'nexus-reveil',          // identifiant du jeu (isolation des données)
+  // Graphismes : le jeu est 100 % procédural par défaut (aucun fichier requis).
+  // Mets `true` quand tu as déposé tes propres images dans assets/sprites/<id>.png
+  // (voir README § « Où sont les images ? »). Sinon le renderer ne fait aucune requête.
+  usePngSprites: false
 };

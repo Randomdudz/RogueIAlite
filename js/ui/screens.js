@@ -528,6 +528,7 @@
     }
     function end() {
       clearInterval(timer);
+      el.onclick = null;                       // évite d'empiler les écouteurs (#cine est réutilisé)
       if (scene.choices) {
         NX.clear(box); box.style.display = 'none';
         scene.choices.forEach(ch => choicesWrap.appendChild(btn(ch.t, 'primary', () => { NX.clear(el); el.classList.add('hidden'); onDone && onDone(ch); })));
@@ -535,12 +536,12 @@
       }
       NX.clear(el); el.classList.add('hidden'); onDone && onDone(scene);
     }
-    el.addEventListener('click', advance);
+    el.onclick = advance;
     const keyHandler = e => { if (e.code === 'Space' || e.code === 'Enter') advance(); };
     window.addEventListener('keydown', keyHandler);
-    const origEnd = end;
-    // nettoie l'écouteur quand la scène se termine
-    onDone = (function (cb) { return function (r) { window.removeEventListener('keydown', keyHandler); cb && cb(r); }; })(onDone);
+    // retire l'écouteur clavier dès que la scène se termine
+    const done = onDone;
+    onDone = function (r) { window.removeEventListener('keydown', keyHandler); done && done(r); };
     showLine();
   }
 
@@ -580,9 +581,14 @@
   }
 
   function finalChoice(run) {
+    const sc = NX.STORY.end_choice;
+    if (sc && sc.choices && P.secretUnlocked() && !sc.choices.some(c => c.goto === 'ending_secret')) {
+      sc.choices.push({ t: '★ REFUSER LES TROIS — LE RÉVEIL PARTAGÉ', goto: 'ending_secret' });
+    }
     cinematic('end_choice', ch => {
       if (!ch) return menu();
-      cinematic(ch.goto, () => { P.setEnding(NX.STORY[ch.goto].ending); endingResult(NX.STORY[ch.goto].ending); });
+      const target = NX.STORY[ch.goto];
+      cinematic(ch.goto, () => { P.setEnding(target.ending); endingResult(target.ending); });
     });
   }
   function endingResult(k) {
@@ -616,5 +622,5 @@
   function close() { hide(); }
   function hide() { clearOverlay(); elLevel().classList.add('hidden'); elCine().classList.add('hidden'); }
 
-  NX.screens = { menu, account, classSelect, map, talents, shop, forge, codex, leaderboard, settings, levelup, closeLevelup, cinematic, runOver, pause, hide, show, screen, btn };
+  NX.screens = { menu, account, classSelect, map, loadout, talents, shop, forge, codex, leaderboard, settings, levelup, closeLevelup, cinematic, endingResult, finalEndings, runOver, pause, hide, show, screen, btn };
 })();

@@ -1,0 +1,10 @@
+# Base de données locale du serveur optionnel (comptes + sauvegardes)
+server/data.json
+
+# Dépendances (le projet n'en a aucune, mais au cas où)
+node_modules/
+
+# Journaux / divers
+*.log
+.DS_Store
+Thumbs.db

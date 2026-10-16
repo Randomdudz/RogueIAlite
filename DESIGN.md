@@ -90,7 +90,7 @@ summon, teleport, laser, shield, homing, healer). Chaque monstre combine 1–3 p
 - **Tronc commun** (obligatoire, garanti pour tous) : PV, dégâts globaux, vitesse, gain de Data,
   gain de Crédits, régén. Personne ne peut « rater » ces upgrades de progression de base.
 - **6 branches de classe** + **4 branches transversales** (Crit, Zone, Vitesse de projetiles, Défense).
-- ~**200 nœuds** : *mineurs* (petits bonus, 1 point), *notables* (effets marquants, 1–2 points),
+- **193 nœuds** : *mineurs* (petits bonus, 1 point), *notables* (effets marquants, 1–2 points),
   *keystones* (changent la façon de jouer, 3 points, choix exclusifs).
 - Le **respec** coûte des Crédits. Tu ne pourras **jamais tout prendre** : on spécialise.
 
@@ -108,16 +108,28 @@ Objectif : **tout débloquer** (tous les talents, tous les niveaux, toutes les c
 
 | Poste | Estimation |
 |---|---|
-| 1re victoire (1 classe, 20 niveaux) | ~6 h |
-| 6 classes × clear complet | ~36 h |
-| Farm talents (≈ 260 points à ~1 pt / 6 min) | ~26 h |
-| Items + forge + raretés (≈ 45 objets, 5 tiers) | ~18 h |
+| 1re victoire (1 classe, 20 niveaux) | ~4 h |
+| 6 classes × clear complet | ~30 h |
+| Farm talents (≈ 260 points à ~1 pt / 5 min) | ~22 h |
+| Items + forge + raretés (≈ 57 objets, 5 tiers) | ~18 h |
 | Fins (3 + secrète) + modes (Cauchemar, Endless) | ~14 h |
 | **Total** | **≈ 100 h** |
 
-Réglette de puissance : un niveau doit durer **8–14 min** ; la courbe de PV/dégâts des monstres suit
-`hp(t) = hp0 · (1 + 0.16·t)^1.35` et `dmg(t) = dmg0 · (1 + 0.11·t)`, `t` = numéro de niveau (1..20).
-Le joueur progresse par : niveaux en run (stats), items, talents, forge, déblocages de classe.
+Réglette de puissance : un niveau dure **4 min (acte I) → 15 min (acte V)**. La courbe de PV/dégâts
+des monstres suit `hp0 · (1 + 0.14·t)` et `dmg0 · (1 + 0.09·t)`, `t` = numéro de niveau (1..20).
+L'**acte I est volontairement adouci** (dégâts ×0,80 → ×1,01, PV ×0,85 → ×1,00) : un profil tout neuf
+(0 talent) doit pouvoir franchir ses premières étapes. Le joueur progresse ensuite par : niveaux en run
+(stats), items, talents, forge et déblocages de classe.
+
+Mesures de référence (bot de simulation, `tools/test-balance.js`) :
+
+| Profil | Niveaux franchis | Lecture |
+|---|---|---|
+| Neuf (0 talent, sans équipement) | **acte I** (niv. 1, 3, 4) | le tutoriel passe, la suite demande de la méta |
+| Tronc + classes (méta complète) | **19 / 20** | un joueur équipé nettoie le jeu, mais un mauvais tirage peut encore tuer |
+
+Résultats structurels (`nx-test.js`) : 39 monstres et 21 boss simulés sans erreur, 85 combinaisons
+arme/variante tirées, 20 niveaux validés (boss tué → victoire), évolution `boucle` + *hyperthread* → `boucle_inf`.
 
 ## 8. Lisibilité (exigence forte)
 

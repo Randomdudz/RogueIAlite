@@ -251,9 +251,14 @@
     return c;
   }
 
-  /* ---------- override PNG (assets/sprites/<id>.png) ---------- */
+  /* ---------- override PNG (assets/sprites/<id>.png) ----------
+     Désactivé par défaut : aucun fichier n'est requis et aucune requête 404
+     n'est émise. Active `usePngSprites` dans cloud-config.js après avoir
+     déposé tes images pour qu'elles remplacent le dessin vectoriel.        */
   const imgs = Object.create(null);
+  const usePng = () => !!(window.NX_CLOUD && window.NX_CLOUD.usePngSprites);
   function imgFor(id) {
+    if (!usePng()) return null;
     let e = imgs[id];
     if (e === undefined) {
       e = imgs[id] = { ok: false, img: null };

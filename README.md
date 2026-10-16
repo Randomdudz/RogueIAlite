@@ -38,7 +38,7 @@ js/data/classes.js         — 6 classes jouables
 js/data/weapons.js         — armes actives + variantes + évolutions
 js/data/items.js           — objets passifs (modificateurs de stats)
 js/data/talents.js         — arbre de talents (généré depuis des clusters, style PoE)
-js/data/monsters.js        — 32+ monstres + patrons d'IA + boss
+js/data/monsters.js        — 39 monstres + patrons d'IA + 21 boss
 js/data/levels.js          — 5 actes × 4 niveaux = 20 étapes, environnements, boss
 js/data/story.js           — lore, cinématiques, dialogues, mentors (Claude, Gemini…)
 js/profile.js              — profil joueur (méta-progression), migrations, sérialisation
@@ -52,8 +52,25 @@ js/ui/hud.js               — barres de vie/XP, icônes d'armes, timer, liste d
 js/ui/screens.js           — menus, arbre de talents, boutique, forge, codex, classement, cinématiques
 js/main.js                 — démarrage + routeur d'écrans
 server/server.js           — serveur Node optionnel (comptes + sauvegarde + classement, zéro dépendance)
+tools/test-load.js         — test headless : charge le jeu, simule monstres/boss/armes/niveaux
+tools/test-balance.js      — bot de simulation pour l'équilibrage (les 20 niveaux × profils méta)
+tools/test-dom.js          — test de fumée : DOM simulé, exerce tous les écrans + une run complète
 DESIGN.md                  — lore, 3 fins, équilibrage ~100 h, contenu détaillé
 ```
+
+## Tests (Node, sans dépendance)
+
+Le jeu est fait de scripts classiques : on peut l'exécuter hors navigateur pour le vérifier. `node` suffit.
+
+```bash
+node tools/test-load.js                        # structure : 39 monstres, 21 boss, 85 armes, 20 niveaux
+node tools/test-balance.js compilateur vet      # équilibrage : bot sur les 20 niveaux (vet|normal|zero)
+node tools/test-dom.js                          # fumée : DOM simulé, tous les écrans + une run complète
+```
+
+`test-load` et `test-balance` chargent les scripts dans un `vm` avec un DOM minimal ;
+`test-dom` va plus loin (Proxy de contexte canvas, boucle d'animation pilotée) et vérifie que
+l'interface, les cinématiques, les fins et une partie entière se déroulent sans exception.
 
 ## Comptes en ligne
 
@@ -68,15 +85,17 @@ Trois backends interchangeables (choisis dans `cloud-config.js`) :
 Le jeu est **100 % dessiné par code** (vectoriel procédural) : chaque créature, arme et effet est une
 fonction de `js/art.js`. C'est net à toutes les résolutions, animé (respiration, marche, flash de dégâts,
 squash & stretch) et sans dépendance externe. Pour **remplacer par tes propres PNG** plus tard :
-dépose-les dans `assets/sprites/<id>.png` — le renderer les détecte et les utilise à la place du dessin
-procédural (voir `art.overrideFor(id)`). Les icônes d'UI sont des SVG inline/CSS.
+dépose-les dans `assets/sprites/<id>.png` (l'`id` est celui du monstre/du boss, ex. `agent.png`,
+`b_mirror.png`) et passe `usePngSprites: true` dans `cloud-config.js`. Le renderer les détecte alors et
+les utilise à la place du dessin procédural (`art.imgFor(id)`). Tant que l'option est `false`, aucune
+requête n'est émise. Les icônes d'UI sont des SVG inline/CSS.
 
 ## Roadmap technique
 
 - [x] Boucle de jeu, input ZQSD, visée auto, caméra
-- [x] 6 classes, armes + variantes + évolutions, 40+ objets passifs
-- [x] Arbre de talents ~200 nœuds (style PoE) + stats agrégées
-- [x] 32 monstres, ~14 patrons d'IA, 20 niveaux, 20 boss
+- [x] 6 classes, armes + variantes + évolutions, 57 objets passifs
+- [x] Arbre de talents 193 nœuds (style PoE) + stats agrégées
+- [x] 39 monstres, 20 patrons d'IA, 20 niveaux, 21 boss
 - [x] Montées de niveau en combat (choix de sorts/variantes/objets), pickups
 - [x] Méta-progression, boutique, forgeron, codex, arbre, classement
 - [x] Cinématiques/dialogues + mentors (Claude, Gemini, Copilot, Mistral, Llama, Deepseek)

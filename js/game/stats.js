@@ -8,7 +8,7 @@
 (function () {
   'use strict';
   const NX = window.NX, M = NX.M;
-  NX.BASE = { hp: 118, speed: 208, crit: 5, critDmg: 150, regen: 0.5 };
+  NX.BASE = { hp: 124, speed: 208, crit: 5, critDmg: 150, regen: 0.8 };
 
   const FLAT = { hp: 1, armor: 1, thorns: 1, regen: 1, count: 1, revive: 1, magnetDur: 1 };
 

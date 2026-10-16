@@ -90,7 +90,8 @@
       NX.bus.on('talent:points', n => { });
       window.addEventListener('keydown', e => {
         if (!this.run || this.over) return;
-        if (NX.input.isPressed('pause') && this.run.state === 'play') this.togglePause();
+        const b = NX.input.bind.pause || [];
+        if (b.indexOf(e.code) >= 0 && this.run.state === 'play') { e.preventDefault(); this.togglePause(); }
       });
       window.addEventListener('blur', () => { if (this.run && !this.over && this.run.state === 'play') this.togglePause(); });
     },
@@ -116,8 +117,6 @@
     },
     _afterScene(scene) {
       if (!scene) return;
-      NX.profile.seeStory(scene.name);
-      // marque la scène vue (clé)
       const key = Object.keys(NX.STORY).find(k => NX.STORY[k] === scene);
       if (key) NX.profile.seeStory(key);
       if (scene.effect && scene.effect.unlock) NX.profile.unlock(scene.effect.unlock);
@@ -172,8 +171,7 @@
         g.addColorStop(0, '#070c14'); g.addColorStop(1, '#04060b');
         ctx.fillStyle = g; ctx.fillRect(0, 0, NX.render.W, NX.render.H);
       }
-      if (this.run && !this.over) NX.hud.update(this.run);
-      else if (this.run && this.over) NX.hud.update(this.run);
+      if (this.run) NX.hud.update(this.run);
       if (NX.profile.d.settings.showFps) {
         const ctx = NX.render.ctx;
         ctx.save(); ctx.fillStyle = '#4dff9f'; ctx.font = '12px Consolas, monospace'; ctx.fillText(Math.round(NX.loop.fps) + ' fps · ' + (this.run ? this.run.enemies.length + ' ennemis · ' + this.run.projs.length + ' proj' : ''), 10, 16); ctx.restore();

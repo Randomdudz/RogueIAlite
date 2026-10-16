@@ -199,7 +199,22 @@
     if (e.boss && e.def.phases) {
       const pct = e.hp / e.maxHp;
       for (let i = e.def.phases.length - 1; i >= 0; i--) {
-        if (pct <= e.def.phases[i].at) { if (e.phase !== i) { e.phase = i; e.beh = e.def.phases[i].beh; e.bt = {}; NX.fx.nova(e.x, e.y, 120, '#ff4d94'); } break; }
+        if (pct <= e.def.phases[i].at) { if (e.phase !== i) { e.phase = i; e.beh = e.def.phases[i].beh; e.bt = {}; e.gapT = 0; NX.fx.nova(e.x, e.y, 120, '#ff4d94'); } break; }
+      }
+    }
+    // les boss ne se laissent pas semer : bond de rattrapage
+    if (e.boss) {
+      e.gapT = (e.gapT || 0) - dt;
+      const dp = M.dist(e.x, e.y, run.player.x, run.player.y);
+      if (dp > 360 && e.gapT <= 0) {
+        e.gapT = 4.5;
+        const a = M.ang(e.x, e.y, run.player.x, run.player.y);
+        const step = Math.max(0, dp - 210);
+        NX.fx.ring(e.x, e.y, 52, '#ff4d94', 0.45); NX.fx.ring(e.x, e.y, 26, '#ffffff', 0.3);
+        e.x += Math.cos(a) * step; e.y += Math.sin(a) * step;
+        NX.fx.ring(e.x, e.y, 52, '#ff4d94', 0.45);
+        e.chargeT = 0.22; e.chargeX = Math.cos(a); e.chargeY = Math.sin(a);
+        run.shake = Math.min(1, run.shake + 0.3);
       }
     }
     if (e.frozen > 0) { e.frozen -= dt; e.vx *= 0.8; e.vy *= 0.8; clampsp(e, 0); return; }

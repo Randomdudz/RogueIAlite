@@ -111,6 +111,7 @@
       this.updateSummons(dt);
       this.updateFields(dt);
       this.updateZones(dt);
+      this.updateMines(dt);
       this.updatePickups(dt);
       this.updateSpawner(dt);
       this.checkEvolutions();
@@ -159,7 +160,7 @@
       }
       if (maxZone > 0) {
         p.zoneAcc = (p.zoneAcc || 0) + dt;
-        if (p.zoneAcc >= 0.3) { p.zoneAcc = 0; this.hurtPlayer(maxZone * 0.3 * 1.6, null, { dot: 1 }); }
+        if (p.zoneAcc >= 0.3) { p.zoneAcc = 0; this.hurtPlayer(maxZone * 0.3 * 1.25, null, { dot: 1 }); }
       } else p.zoneAcc = 0;
     }
 
@@ -378,6 +379,23 @@
       this.fields = this.fields.filter(f => (f.t < f.life));
     }
 
+    updateMines(dt) {
+      for (const m of this.mines) {
+        if (m.dead) continue;
+        m.t += dt;
+        for (const e of this.enemies) {
+          if (e.dead) continue;
+          if (M.dist2(e.x, e.y, m.x, m.y) < (e.r + 16) ** 2) {
+            this.explode(m.x, m.y, m.res.explode || 80, m.res.dmg, m.res.dmgType);
+            if (m.res.chainMines) this.addZone({ x: m.x, y: m.y, r: 60, dmg: m.res.dmg * 0.3, tickT: 0.5, life: 2, hostile: false, color: '#c48bff', dmgType: m.res.dmgType });
+            m.dead = true;
+            break;
+          }
+        }
+      }
+      this.mines = this.mines.filter(m => !m.dead);
+    }
+
     updateZones(dt) {
       for (const z of this.zones) { z.t += dt; z.tick = (z.tick || 0) + dt; if (!z.hostile && z.tick >= (z.tickT || 0.5)) { z.tick = 0; this.aoeDamageEnemies(z.x, z.y, z.r, z.dmg, z.dmgType || 'thermal', {}); } }
       this.zones = this.zones.filter(z => z.t < z.life);
@@ -579,13 +597,14 @@
     /* ---------- spawner ---------- */
     updateSpawner(dt) {
       const L = this.level;
-      const prog = M.clamp(this.time / L.dur, 0, 1);
+      if (this.time < 2.5) return;                       // court répit au démarrage
+      const prog = M.clamp((this.time - 2.5) / L.dur, 0, 1);
       // fin de niveau → boss
       if (this.time >= L.dur && !this.bossSpawned) { this.spawnBoss(); return; }
       if (this.bossSpawned) return;                      // plus de spawns pendant le boss
       this.spawnT -= dt;
       if (this.spawnT > 0) return;
-      const interval = M.lerp(1.75, 0.52, prog) / (1 + this.reached * 0.008);
+      const interval = M.lerp(2.0, 0.5, prog) / (1 + this.reached * 0.008);
       this.spawnT = interval * (0.8 + this.rng.f() * 0.5);
       const count = 1 + Math.floor(this.rng.f() * (1 + prog * 2.6));
       for (let i = 0; i < count; i++) {
