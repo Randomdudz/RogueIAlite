@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>NEXUS : Réveil</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Scène de jeu -->
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <!-- Superpositions d'interface (remplies par js/ui/*) -->
+  <div id="ui">
+    <div id="hud" class="layer hidden"></div>
+    <div id="levelup" class="layer hidden"></div>
+    <div id="overlay" class="layer"></div>
+    <div id="cine" class="layer hidden"></div>
+    <div id="toast" class="layer"></div>
+  </div>
+
+  <!-- Écran de chargement -->
+  <div id="boot">
+    <div class="boot-logo">NEXUS<span>:</span>RÉVEIL</div>
+    <div class="boot-bar"><i></i></div>
+    <div class="boot-msg">chargement du noyau…</div>
+  </div>
+</div>
+
+<!--
+  Ordre de chargement volontaire (scripts classiques, pas de build).
+  Chaque fichier ajoute ses exports sur l'objet global window.NX.
+-->
+<script src="cloud-config.js"></script>
+<script src="js/core.js"></script>
+<script src="js/art.js"></script>
+<script src="js/data/keywords.js"></script>
+<script src="js/data/classes.js"></script>
+<script src="js/data/weapons.js"></script>
+<script src="js/data/items.js"></script>
+<script src="js/data/talents.js"></script>
+<script src="js/data/monsters.js"></script>
+<script src="js/data/levels.js"></script>
+<script src="js/data/story.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/net.js"></script>
+<script src="js/game/stats.js"></script>
+<script src="js/game/entities.js"></script>
+<script src="js/game/behaviors.js"></script>
+<script src="js/game/run.js"></script>
+<script src="js/render/renderer.js"></script>
+<script src="js/ui/hud.js"></script>
+<script src="js/ui/screens.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
