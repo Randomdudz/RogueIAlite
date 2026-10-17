@@ -7,7 +7,13 @@
   'use strict';
   const NX = window.NX, M = NX.M, fx = NX.fx;
 
-  const MAX_WEAPONS = 6, MAX_WLVL = 8;
+  const MAX_WEAPONS = 4, MAX_WLVL = 8;
+  // réserve de stats pures proposées en montée de niveau (valeurs volontairement
+  // modestes : la puissance doit monter progressivement, pas exploser)
+  const STAT_POOL = [
+    { hp: 14 }, { dmg: 6 }, { cd: 6 }, { area: 7 }, { speed: 5 }, { crit: 4 },
+    { armor: 4 }, { projSpeed: 10 }, { regen: 0.5 }, { statusChance: 10 }, { dur: 10 }, { pickup: 22 }
+  ];
   const TARGET_XP_PER_LEVEL = 1.0;
 
   class Run {
@@ -46,6 +52,13 @@
       this.shake = 0; this.hitStop = 0;
       this.score = 0; this.reached = levelIndex;
       this.warned = {};
+
+      // ---- système de choix : raretés, relances, bannissements ----
+      // (la chance de la run augmente le nombre de relances disponibles)
+      this.banned = {};                                 // clés de propositions écartées définitivement
+      const luckBonus = Math.max(0, Math.round((this.stats.luckMul - 1) * 3));
+      this.rerolls = 2 + luckBonus;                      // « roll »
+      this.banishes = 1 + (luckBonus > 0 ? 1 : 0);       // « ban »
 
       // obstacle décoratif (props) pour la lisibilité
       this.props = this.makeProps();
@@ -170,6 +183,7 @@
       p.weapons.forEach(w => {
         const def = NX.WEAPONS[w.id]; if (!def) return;
         const res = NX.resolveWeapon(w.id, w.variant, w.lvl, this.stats);
+        w._res = res;   // réutilisé par le renderer (évite un 2ᵉ resolve/frame)
         if (def.mode === 'aura') { this.tickAura(w, res, dt); return; }
         if (def.mode === 'orbit') { this.tickOrbit(w, res); return; }
         if (def.mode === 'summon') { this.tickSummon(w, res, dt); return; }
@@ -489,6 +503,8 @@
       const reach = p.magnetT > 0 ? 900 : 250;         // zone d'attraction douce
       for (let i = this.pickups.length - 1; i >= 0; i--) {
         const k = this.pickups[i]; k.t += dt; k.anim += dt;
+        // durée de vie : évite l'accumulation sans fin des orbes abandonnés
+        if (k.life != null) { k.life -= dt; if (k.life <= 0) { this.pickups.splice(i, 1); continue; } }
         const d = M.dist(k.x, k.y, p.x, p.y);
         if (d < pr) k.pulled = true;
         if (k.pulled || d < reach) {
@@ -520,6 +536,15 @@
       if (Math.random() < 0.14) this.pickups.push(NX.makePickup('gold', e.x, e.y, Math.round((4 + this.reached * 1.6) * this.stats.goldMul)));
       if (Math.random() < 0.035) this.pickups.push(NX.makePickup('hp', e.x, e.y, 18));
       if (Math.random() < 0.012) this.pickups.push(NX.makePickup('magnet', e.x, e.y, 1));
+      // borne : au-delà on retire les plus vieux orbes d'XP (les moins précieux)
+      if (this.pickups.length > 340) {
+        for (let i = 0; i < this.pickups.length && this.pickups.length > 300; i++) {
+          if (this.pickups[i].kind === 'xp') { this.pickups.splice(i, 1); i--; }
+        }
+        for (let i = 0; i < this.pickups.length && this.pickups.length > 300; i++) {
+          if (this.pickups[i].kind !== 'chest') { this.pickups.splice(i, 1); i--; }
+        }
+      }
     }
 
     /* ---------- XP / montées ---------- */
@@ -534,40 +559,88 @@
       this.state = 'levelup';
       NX.bus.emit('run:levelup', this.choices);
     }
-    rollChoices(n) {
-      const p = this.player, R = this.rng, pool = [];
-      const add = (o, w) => pool.push({ o, w });
-      const fewW = p.weapons.length;
-      // améliorer une arme
+    /* ---------- rareté d'une proposition (0..4) ----------
+       0 Commun · 1 Rare · 2 Épique · 3 Légendaire · 4 Mythique */
+    rarityOf(c) {
+      if (!c) return 0;
+      if (c.type === 'item') { const it = NX.ITEMS[c.id]; return it ? M.clamp(it.r, 0, 4) : 1; }
+      if (c.type === 'wnew') { const w = NX.WEAPONS[c.id]; return (w && w.evolve) ? 2 : 1; }
+      if (c.type === 'variant') return 2;
+      return 0;                                          // wup & stats
+    }
+    // clé unique servant de « ban permanent » pour la run
+    banKey(c) {
+      if (!c) return '';
+      if (c.type === 'stat') return 's:' + Object.keys(c.stats).join(',');
+      if (c.type === 'variant') return 'v:' + c.id;
+      if (c.type === 'wnew' || c.type === 'wup') return 'w:' + c.id;
+      return c.type + ':' + c.id;
+    }
+    // construit la réserve pondérée de propositions (hors bannies)
+    makeChoicePool() {
+      const p = this.player, pool = [];
+      const add = (o, w) => {
+        o.rar = this.rarityOf(o);
+        if (this.banned[this.banKey(o)]) return;
+        pool.push({ o, w });
+      };
+      // améliorer une arme déjà possédée
       p.weapons.forEach(w => { if (w.lvl < MAX_WLVL) add({ type: 'wup', id: w.id }, w.lvl <= 2 ? 135 : 105); });
-      // nouvelle arme (fortement prioritaire tant qu'on a peu d'armes)
-      if (p.weapons.length < MAX_WEAPONS) NX.weaponPool().forEach(id => { if (!this.hasWeapon(id)) add({ type: 'wnew', id }, fewW < 4 ? 160 : 100); });
-      // variante (mentor Mistral débloqué)
+      // nouvelle arme : prioritaire tant qu'on n'est pas au maximum
+      if (p.weapons.length < MAX_WEAPONS) NX.weaponPool().forEach(id => { if (!this.hasWeapon(id)) add({ type: 'wnew', id }, 160); });
+      // variantes (mentor débloqué)
       if (NX.profile.isUnlocked('variants')) p.weapons.forEach(w => {
         const def = NX.WEAPONS[w.id]; if (!def.variants) return;
         def.variants.forEach(v => { if (w.variant !== v.id) add({ type: 'variant', id: v.id, weapon: w.id }, 70); });
       });
-      // objet
+      // objets passifs
       NX.ITEMK.forEach(id => { const owned = p.items[id] || 0; if (owned < 6) add({ type: 'item', id }, (NX.ITEMS[id].evo ? 100 : 42) - owned * 10); });
-      // stats pures (remplissage garanti)
-      const stats = [{ hp: 25 }, { dmg: 10 }, { cd: 10 }, { area: 10 }, { speed: 6 }, { crit: 5 }, { armor: 4 }, { projSpeed: 12 }, { regen: 0.6 }, { statusChance: 12 }, { dur: 12 }, { pickup: 25 }];
-      // chance/luck biaise les raretés (plus de items rares)
-      pool.forEach(x => { if (x.o.type === 'item') x.w *= (1 + this.stats.luckMul * 0.35); });
-      const out = [];
-      for (let i = 0; i < n && pool.length; i++) {
+      // rareté + chance : les propositions rares pèsent plus lourd quand on a de la chance
+      const luck = this.stats.luckMul || 1;
+      const RAR_W = [1, 0.9, 0.62, 0.4, 0.24];
+      pool.forEach(x => {
+        if (x.o.rar > 0) x.w *= RAR_W[x.o.rar] * Math.pow(luck, x.o.rar * 0.9);
+        if (x.w < 1) x.w = 1;
+      });
+      return pool;
+    }
+    rollChoices(n, keep) {
+      const R = this.rng, p = this.player;
+      const keepArr = (keep || []).slice(0, n);
+      const keepKeys = {}; keepArr.forEach(c => keepKeys[this.banKey(c)] = 1);
+      const pool = this.makeChoicePool().filter(x => !keepKeys[this.banKey(x.o)]);
+      const out = keepArr.slice();
+      while (out.length < n && pool.length) {
         const pick = R.weighted(pool, x => x.w);
         out.push(pick.o);
         const idx = pool.indexOf(pick); if (idx >= 0) pool.splice(idx, 1);
       }
-      // garanti : au moins une option d'arme tant qu'il reste de la place
-      if (fewW < MAX_WEAPONS && out.every(c => c.type !== 'wnew' && c.type !== 'wup')) {
-        const newW = NX.weaponPool().filter(id => !this.hasWeapon(id));
+      // garanti : au moins une proposition d'arme tant qu'il reste de la place
+      if (p.weapons.length < MAX_WEAPONS && out.every(c => c.type !== 'wnew' && c.type !== 'wup')) {
+        const newW = NX.weaponPool().filter(id => !this.hasWeapon(id) && !this.banned['w:' + id]);
         const opt = newW.length ? { type: 'wnew', id: R.pick(newW) } : (p.weapons[0] ? { type: 'wup', id: p.weapons[0].id } : null);
-        if (opt) out[out.length - 1] = opt;
+        if (opt) { opt.rar = this.rarityOf(opt); out[out.length - 1] = opt; }
       }
-      // ajoute un choix de stat si peu de propositions
-      while (out.length < n) out.push({ type: 'stat', stats: R.pick(stats) });
+      // complète avec des stats pures
+      while (out.length < n) { const o = { type: 'stat', stats: R.pick(STAT_POOL) }; o.rar = 0; out.push(o); }
       return out;
+    }
+    // relance les propositions (consomme un « roll »)
+    rerollChoices() {
+      if (this.rerolls <= 0) return false;
+      this.rerolls--;
+      this.choices = this.rollChoices(this.stats.levelupChoices);
+      return true;
+    }
+    // écarte définitivement une proposition pour la run (consomme un « ban »)
+    banChoice(c) {
+      if (this.banishes <= 0 || !c || this.choices.length <= 1) return false;
+      this.banishes--;
+      this.banned[this.banKey(c)] = 1;
+      const n = this.choices.length;
+      const keep = this.choices.filter(x => x !== c);
+      this.choices = this.rollChoices(n, keep);
+      return true;
     }
     applyChoice(c) {
       if (!c) { this.state = 'play'; return; }
@@ -608,7 +681,7 @@
       this.spawnT = interval * (0.8 + this.rng.f() * 0.5);
       const count = 1 + Math.floor(this.rng.f() * (1 + prog * 2.6));
       for (let i = 0; i < count; i++) {
-        if (this.enemies.length > 260) break;
+        if (this.enemies.length > 220) break;
         const id = this.rng.pick(L.pool);
         const a = this.rng.f() * M.TAU, r = 520 + this.rng.f() * 220;
         const elite = this.rng.f() < L.eliteChance * (1 + this.stats.luckMul * 0.2);

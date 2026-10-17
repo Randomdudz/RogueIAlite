@@ -54,6 +54,14 @@ difficulté ; à la fin, un **boss** valide le niveau. Tu ramasses **Data** (XP)
 **Crédits** (monnaie). Chaque montée de niveau = **choix de 1 parmi 3** (nouvelle arme, *variante*
 d'une arme possédée, objet passif, ou stat). Certaines armes **évoluent** si un objet précis est porté.
 
+Tu ne peux porter que **4 armes** au maximum : il faut choisir son arsenal. Chaque proposition de
+montée de niveau a une **rareté** (Commun / Rare / Épique / Légendaire / Mythique) tirée en fonction
+de la **Chance** de la run. En cours de partie tu disposes de :
+- 🎲 **Relances** : retire les propositions et en tire de nouvelles.
+- 🚫 **Bannissements** : écarte **définitivement** une proposition pour la run (elle ne réapparaîtra plus).
+
+La **Chance** (`luck`) augmente le nombre de relances et la probabilité de voir les propositions rares.
+
 ## 4. Personnages / classes (6)
 
 | Classe | Fantaisie | Arme de départ | Perk unique |
@@ -89,9 +97,13 @@ summon, teleport, laser, shield, homing, healer). Chaque monstre combine 1–3 p
 
 - **Tronc commun** (obligatoire, garanti pour tous) : PV, dégâts globaux, vitesse, gain de Data,
   gain de Crédits, régén. Personne ne peut « rater » ces upgrades de progression de base.
-- **6 branches de classe** + **4 branches transversales** (Crit, Zone, Vitesse de projetiles, Défense).
+- **6 branches de classe** + **4 branches transversales** (Précision, Amplitude, Balistique, Défense).
+  Les branches transversales sont **globales** : elles se retrouvent dans tous les arbres de classe.
 - **104 nœuds** : *mineurs* (petits bonus, 1 point), *notables* (effets marquants, 1–2 points),
-  *keystones* (changent la façon de jouer, 3 points, choix exclusifs).
+  *keystones* (changent la façon de jouer, 3 points).
+- **Choix obligatoires** : on ne peut prendre que **2 keystones** au total par arbre (le keystone du
+  tronc commun est hors quota). L'arbre est bien plus grand que ce qu'un build peut absorber :
+  chaque build est une spécialisation, pas une collection.
 - Le **respec** coûte des Crédits. Tu ne pourras **jamais tout prendre** : on spécialise.
 - **Monnaie unique : les Crédits.** Gagnés à chaque run (butin ramassé + prime de mission,
   même en cas d'échec), dépensés chez le **Marchand**, au **Forgeron**, pour le **respec**, ou
@@ -131,13 +143,35 @@ Mesures de référence (bot de simulation, `tools/test-balance.js`) :
 
 | Profil | Niveaux franchis | Lecture |
 |---|---|---|
-| Neuf (0 talent, sans équipement) | **acte I** (niv. 1, 3, 4) | le tutoriel passe, la suite demande de la méta |
-| Tronc + classes (méta complète) | **19 / 20** | un joueur équipé nettoie le jeu, mais un mauvais tirage peut encore tuer |
+| Neuf (0 talent, sans équipement) | **3 / 20** (niv. 1, 2) | le tutoriel passe, la suite demande de la méta |
+| Tronc commun seul (4 points) | **8 / 20** | la progression de base tient le début, pas la fin |
+| Méta complète (vétéran) | **20 / 20** | un joueur équipé nettoie le jeu, mais un mauvais tirage peut encore tuer |
 
-Résultats structurels (`nx-test.js`) : 39 monstres et 21 boss simulés sans erreur, 85 combinaisons
+Depuis l'équilibrage : **4 armes maximum**, courbe d'XP ralentie, gain par niveau d'arme réduit, propositions
+de stats plus modestes. La puissance monte donc **progressivement** au lieu d'exploser dans les premières minutes.
+
+Résultats structurels (`tools/test-load.js`) : 39 monstres et 21 boss simulés sans erreur, 85 combinaisons
 arme/variante tirées, 20 niveaux validés (boss tué → victoire), évolution `boucle` + *hyperthread* → `boucle_inf`.
 
-## 8. Lisibilité (exigence forte)
+## 8. Performance (contrainte forte)
+
+Objectif : **aucune dérive** après plusieurs minutes de partie. Ce qui rendait le jeu poussif :
+
+- `ctx.shadowBlur` sur **chaque** projectile / pickup / tir ennemi / orbe : un flou par appel, ça
+  s'écroule dès qu'il y a des centaines d'objets. Remplacé par un **halo bon marché** (deux disques
+  additifs, `renderer.js → glow()`).
+- **Pickups sans durée de vie** : les orbes d'XP abandonnés s'accumulaient sans fin. Ils ont
+  maintenant une durée de vie (25–45 s) et un **plafond** (≈ 300).
+- **Effets non bornés** : plafond de 520 effets simultanés + plafond de nombres de dégâts (45).
+- **DOM réécrit à chaque frame** dans le HUD : les textes ne sont mis à jour que lorsqu'ils changent.
+- **Dégradés recréés à chaque frame** (fond, vignette, CRT, scanlines) : mis en cache (les scanlines
+  passent de ~150 `fillRect` à un seul `fillPattern`).
+- **Armes résolues deux fois par frame** (update + render) : résultat mis en cache par arme.
+
+Garde-fou automatisé : `node tools/test-perf.js` simule une longue run saturée et vérifie que
+ennemis / projectiles / pickups / effets restent **bornés** et que la population se stabilise.
+
+## 9. Lisibilité (exigence forte)
 
 - Le **joueur est toujours au-dessus des effets**, avec un contour net + halo holographique.
 - Les monstres ont une **silhouette distincte par famille** + barre de vie au-dessus.

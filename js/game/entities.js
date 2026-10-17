@@ -20,7 +20,7 @@
       anim: 0, emo: 1, emoT: 0
     };
   };
-  NX.xpNeed = l => Math.floor(14 + 9 * Math.pow(l, 1.42));
+  NX.xpNeed = l => Math.floor(16 + 12 * Math.pow(l, 1.55));
 
   /* ---------------- ENNEMI ---------------- */
   NX.makeEnemy = function (defId, x, y, mods, opts) {
@@ -111,25 +111,43 @@
     }, o);
   };
 
-  /* ---------------- PICKUPS ---------------- */
+  /* ---------------- PICKUPS ----------------
+     `life` : durée de vie avant disparition. Les orbes d'XP/butin
+     abandonnés loin du joueur ne s'accumulent donc plus sans fin (fuite
+     de performance qui faisait ramer le jeu après quelques minutes). */
+  const PICKUP_LIFE = { xp: 25, gold: 40, hp: 40, magnet: 45, chest: 1e9 };
   NX.makePickup = function (kind, x, y, value) {
-    return { kind, x, y, value: value || 1, r: kind === 'chest' ? 20 : 9, t: 0, vx: 0, vy: 0, pulled: false, dead: false, anim: Math.random() * 6.28 };
+    return { kind, x, y, value: value || 1, r: kind === 'chest' ? 20 : 9, t: 0, vx: 0, vy: 0, pulled: false, dead: false, anim: Math.random() * 6.28, life: PICKUP_LIFE[kind] || 30 };
   };
 
   /* ---------------- EFFETS (visuel) ---------------- */
+  const FX_MAX = 520;
   NX.fx = {
     list: [],
-    add(kind, x, y, o) { this.list.push(Object.assign({ kind, x, y, t: 0, dur: 0.3, size: 20, color: '#fff', rot: 0, vx: 0, vy: 0 }, o || {})); },
+    _texts: 0,
+    add(kind, x, y, o) {
+      // borne dure : on jette les plus vieux effets par paquets (amorti)
+      if (this.list.length >= FX_MAX) {
+        const cut = this.list.splice(0, 80);
+        for (let i = 0; i < cut.length; i++) if (cut[i].kind === 'text' && this._texts > 0) this._texts--;
+      }
+      this.list.push(Object.assign({ kind, x, y, t: 0, dur: 0.3, size: 20, color: '#fff', rot: 0, vx: 0, vy: 0 }, o || {}));
+    },
+    // sous le mode « lisibilité » les étincelles/explosions ne sont pas dessinées :
+    // inutile de les créer (économie mémoire + CPU)
+    _lite() { return !!(NX.profile && NX.profile.d && NX.profile.d.settings && NX.profile.d.settings.readability); },
     slash(x, y, ang, size, color) { this.add('slash', x, y, { ang, size, color, dur: 0.18 }); },
     ring(x, y, size, color, dur) { this.add('ring', x, y, { size, color, dur: dur || 0.42 }); },
     nova(x, y, size, color) { this.add('nova', x, y, { size, color, dur: 0.5 }); },
-    boom(x, y, size, color) { this.add('boom', x, y, { size, color, dur: 0.4 }); },
-    spark(x, y, color, n) { for (let i = 0; i < (n || 3); i++) { const a = Math.random() * M.TAU, s = 60 + Math.random() * 160; this.add('spark', x, y, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, color, size: 2 + Math.random() * 3, dur: 0.25 + Math.random() * 0.35 }); } },
+    boom(x, y, size, color) { if (this._lite()) return; this.add('boom', x, y, { size, color, dur: 0.4 }); },
+    spark(x, y, color, n) { if (this._lite()) return; for (let i = 0; i < (n || 3); i++) { const a = Math.random() * M.TAU, s = 60 + Math.random() * 160; this.add('spark', x, y, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, color, size: 2 + Math.random() * 3, dur: 0.25 + Math.random() * 0.35 }); } },
     bolt(x1, y1, x2, y2, color) { this.add('bolt', x1, y1, { x2, y2, color, dur: 0.16, seg: zigzag(x1, y1, x2, y2) }); },
     beam(x, y, ang, len, w, color, dur) { this.add('beam', x, y, { ang, len, w: w || 8, color, dur: dur || 0.3 }); },
-    text(x, y, txt, color, size) { this.add('text', x, y, { txt, color: color || '#fff', size: size || 13, dur: 0.75, vy: -40 }); },
-    update(dt) { const l = this.list; for (let i = l.length - 1; i >= 0; i--) { const f = l[i]; f.t += dt; if (f.vx) f.x += f.vx * dt; if (f.vy) f.y += f.vy * dt; if (f.vx) f.vx *= 0.94; if (f.vy) f.vy *= 0.94; if (f.t >= f.dur) l.splice(i, 1); } },
-    clear() { this.list.length = 0; }
+    // plafond de nombres de dégâts simultanés : on évite d'inonder l'écran
+    // ET de saturer la liste d'effets dans les gros combats
+    text(x, y, txt, color, size) { if (this._texts > 45) return; this._texts++; this.add('text', x, y, { txt, color: color || '#fff', size: size || 13, dur: 0.75, vy: -40 }); },
+    update(dt) { const l = this.list; for (let i = l.length - 1; i >= 0; i--) { const f = l[i]; f.t += dt; if (f.vx) f.x += f.vx * dt; if (f.vy) f.y += f.vy * dt; if (f.vx) f.vx *= 0.94; if (f.vy) f.vy *= 0.94; if (f.t >= f.dur) { if (f.kind === 'text' && this._texts > 0) this._texts--; l.splice(i, 1); } } },
+    clear() { this.list.length = 0; this._texts = 0; }
   };
   function zigzag(x1, y1, x2, y2) {
     const seg = [], n = 6, dx = x2 - x1, dy = y2 - y1;

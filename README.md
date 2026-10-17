@@ -48,7 +48,7 @@ js/game/entities.js        — Player / Enemy / Projectile / Pickup / Effect
 js/game/behaviors.js       — patrons d'attaque des monstres (tirent, chargent, explosent…)
 js/game/run.js             — cœur d'une partie : spawn, combat, boss, montées de niveau
 js/render/renderer.js      — caméra, ordre de dessin, lisibilité, fond procédural
-js/ui/hud.js               — barres de vie/XP, icônes d'armes, timer, liste des boss
+js/ui/hud.js               — HUD : minuterie, compteurs, icônes d'armes/objets, barre de boss
 js/ui/screens.js           — menus, arbre de talents, boutique, forge, codex, classement, cinématiques
 js/main.js                 — démarrage + routeur d'écrans
 server/server.js           — serveur Node optionnel (comptes + sauvegarde + classement, zéro dépendance)
@@ -56,6 +56,7 @@ tools/test-load.js         — test headless : charge le jeu, simule monstres/bo
 tools/test-balance.js      — bot de simulation pour l'équilibrage (les 20 niveaux × profils méta)
 tools/test-dom.js          — test de fumée : DOM simulé, exerce tous les écrans + une run complète
 tools/test-talents.js      — géométrie de l'arbre de talents (aucun nœud superposé, tout est visible)
+tools/test-perf.js         — simulation d'une LONGUE run : vérifie que les entités restent bornées
 DESIGN.md                  — lore, 3 fins, équilibrage ~100 h, contenu détaillé
 ```
 
@@ -68,6 +69,7 @@ node tools/test-load.js                        # structure : 39 monstres, 21 bos
 node tools/test-balance.js compilateur vet      # équilibrage : bot sur les 20 niveaux (vet|normal|zero)
 node tools/test-dom.js                          # fumée : DOM simulé, tous les écrans + une run complète
 node tools/test-talents.js                      # arbre : géométrie (pas de chevauchement, tout visible)
+node tools/test-perf.js 10 470                  # perf : 470 s simulées, entités bornées (niveau secondes)
 ```
 
 `test-load` et `test-balance` chargent les scripts dans un `vm` avec un DOM minimal ;

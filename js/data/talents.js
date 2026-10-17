@@ -2,7 +2,7 @@
    NEXUS : Réveil — ARBRE DE TALENTS (style Path of Exile)
    - Tronc COMMUN (global, appliqué à toutes les classes)
    - 6 branches de CLASSE (par classe, choix de build)
-   - 4 branches TRANSVERSALES (par classe, disponibles à tous)
+   - 4 branches TRANSVERSALES (globales, communes à toutes les classes)
    ~198 nœuds. On ne peut jamais tout prendre : on spécialise.
    kind : 'minor'(1) · 'notable'(2) · 'key'(3, keystone)
    ============================================================ */
@@ -189,8 +189,10 @@
   NX.TALENTS = { nodes, root, all };
   NX.KEYSTONES = all.filter(id => nodes[id].kind === 'key' && nodes[id].flag && nodes[id].flag !== 'root');
 
-  /* Portée de stockage : 'core' = global, sinon id de classe/transversal */
-  NX.scopeOf = id => nodes[id].cls === 'core' ? 'core' : nodes[id].cls;
+  /* Portée de stockage : 'core' = tronc commun (global), 'x' = branches
+     transversales (globales, communes à toutes les classes), sinon id de classe. */
+  NX.scopeOf = id => { const c = nodes[id].cls; if (c === 'core') return 'core'; return c.charAt(0) === 'x' ? 'x' : c; };
+  NX.isTransversal = id => { const c = nodes[id] && nodes[id].cls; return !!c && c.charAt(0) === 'x'; };
   /* Un nœud est-il accessible selon les points alloués d'un scope ? */
   NX.talentAvail = (id, allocated) => {
     const nd = nodes[id]; if (!nd || allocated[id]) return false;

@@ -48,7 +48,7 @@
     };
     addAlloc('core');
     addAlloc(classId);
-    NX.XBRANCHK.forEach(x => addAlloc(x));
+    addAlloc('x');   // branches transversales (globales)
 
     // 4) objets équipés (loadout) + ramassés en run
     const gear = (opts.loadoutOverride || p.loadout || []);
@@ -163,8 +163,8 @@
     const v = variantId ? NX.WVARIANT[variantId] : null;
     if (v && v.mods) applyMods(base, v.mods);
     const L = Math.max(1, lvl || 1);
-    const lvlDmg = 1 + 0.24 * (L - 1);
-    const lvlCd = Math.max(0.55, 1 - 0.045 * (L - 1));
+    const lvlDmg = 1 + 0.19 * (L - 1);
+    const lvlCd = Math.max(0.62, 1 - 0.035 * (L - 1));
     // multiplicateurs joueur (les invocations profitent de summonMul)
     const isSummon = w.mode === 'summon';
     const pmul = st.dmgMul * (isSummon ? st.summonMul : 1) * st.typeMul(w.dmg || 'kinetic');

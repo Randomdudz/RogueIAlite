@@ -274,27 +274,37 @@
      OVERLAY ÉCRAN CRT — dessiné en dernière couche par le renderer
      (scanlines animées, vignette renforcée, reflet d'écran)
      ============================================================ */
+  let _crtG = null, _crtR = null, _scanPat = false;
   function crt(ctx, w, h, t) {
+    // scanlines : un motif répété (1 seul fillRect) au lieu de ~150 fillRect/frame
+    if (!_scanPat) {
+      try {
+        const cv = document.createElement('canvas'); cv.width = 1; cv.height = 5;
+        const cc = cv.getContext('2d');
+        if (cc) { cc.fillStyle = 'rgba(0,0,0,0.10)'; cc.fillRect(0, 0, 1, 3); _scanPat = ctx.createPattern ? ctx.createPattern(cv, 'repeat') : 'loop'; }
+        else _scanPat = 'loop';
+      } catch (e) { _scanPat = 'loop'; }
+    }
     ctx.save();
-    // scanlines fines qui défilent
-    ctx.globalAlpha = 0.10;
-    ctx.fillStyle = '#000';
-    const line = 3, gap = 2;
-    for (let y = (t * 90) % (line + gap); y < h; y += line + gap) {
-      ctx.fillRect(0, y, w, line);
+    if (_scanPat && _scanPat !== 'loop') {
+      ctx.translate(0, (t * 90) % 5);
+      ctx.fillStyle = _scanPat; ctx.fillRect(0, -5, w, h + 10);
+    } else {
+      ctx.globalAlpha = 0.10; ctx.fillStyle = '#000';
+      for (let y = (t * 90) % 5; y < h; y += 5) ctx.fillRect(0, y, w, 3);
     }
     ctx.restore();
-    // vignette renforcée + bords assombris
-    const g = ctx.createRadialGradient(w / 2, h / 2, w * 0.22, w / 2, h / 2, w * 0.9);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(0.5, 'rgba(8,12,22,0.30)');
-    g.addColorStop(1, 'rgba(2,4,8,0.92)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-    // reflet d'écran en haut (très subtil)
-    const rg = ctx.createLinearGradient(0, 0, 0, h * 0.12);
-    rg.addColorStop(0, 'rgba(255,255,255,0.03)');
-    rg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = rg; ctx.fillRect(0, 0, w, h * 0.12);
+    if (!_crtG) {
+      _crtG = ctx.createRadialGradient(w / 2, h / 2, w * 0.22, w / 2, h / 2, w * 0.9);
+      _crtG.addColorStop(0, 'rgba(0,0,0,0)');
+      _crtG.addColorStop(0.5, 'rgba(8,12,22,0.30)');
+      _crtG.addColorStop(1, 'rgba(2,4,8,0.92)');
+      _crtR = ctx.createLinearGradient(0, 0, 0, h * 0.12);
+      _crtR.addColorStop(0, 'rgba(255,255,255,0.03)');
+      _crtR.addColorStop(1, 'rgba(255,255,255,0)');
+    }
+    ctx.fillStyle = _crtG; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = _crtR; ctx.fillRect(0, 0, w, h * 0.12);
     ctx.globalAlpha = 1;
   }
 

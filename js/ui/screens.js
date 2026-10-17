@@ -229,6 +229,7 @@
       h('h1', {}, 'ARBRE DE TALENTS'),
       h('div', { class: 'spacer' }),
       h('div', { class: 'points' }, P.d.points + ' pts'),
+      h('div', { class: 'points', style: 'color:#c48bff' }, '★ ' + P.keystonesIn(cls) + '/' + P.keystoneCap()),
       h('div', { class: 'points', style: 'color:#ffd479' }, '₡ ' + M.fmt(P.d.credits)),
       btn('Arbre de : ' + NX.CLASSES[cls].n, 'sm', () => { pickClass(); }),
       btn('+1 point (' + P.pointCost() + '₡)', 'sm', () => {
@@ -244,7 +245,7 @@
     const cv = h('canvas', { id: 'talent-canvas' });
     body.appendChild(cv);
     const info = h('div', { class: 'talent-info' });
-    const help = h('div', { class: 'talent-help' }, 'Molette : zoom · Glisser : déplacer · Clic : sélectionner un nœud. Le tronc commun (centre) profite à toutes les classes. Les branches de classe et transversales sont propres à chaque classe.');
+    const help = h('div', { class: 'talent-help' }, 'Molette : zoom · Glisser : déplacer · Clic : sélectionner un nœud. Le tronc commun (centre) et les branches transversales (extérieur) profitent à toutes les classes. Les branches de classe sont propres à leur classe. ★ Keystones limités à ' + P.keystoneCap() + ' par arbre : choisis ton build.');
     body.appendChild(info); body.appendChild(help);
     wrap.appendChild(top); wrap.appendChild(body);
     show(wrap);
@@ -278,11 +279,11 @@
     }
     setTimeout(resize, 0);
 
-    function alloc() { return cls === 'core' ? P.d.talents.core : Object.assign({}, P.d.talents.core, P.d.talents.byClass[cls] || {}); }
+    function alloc() { return cls === 'core' ? P.d.talents.core : Object.assign({}, P.d.talents.core, P.d.talents.byClass[cls] || {}, P.d.talents.byClass.x || {}); }
 
     function draw() {
       const allocSet = {};
-      Object.assign(allocSet, P.d.talents.core); Object.assign(allocSet, P.d.talents.byClass[cls] || {});
+      Object.assign(allocSet, P.d.talents.core); Object.assign(allocSet, P.d.talents.byClass[cls] || {}); Object.assign(allocSet, P.d.talents.byClass.x || {});
       ctx.clearRect(0, 0, cw, ch);
       const g = ctx.createLinearGradient(0, 0, cw, ch);
       g.addColorStop(0, '#05080e'); g.addColorStop(1, '#0a0f18');
@@ -425,9 +426,22 @@
       if (!Object.keys(n.stats).length && !n.flag) st.appendChild(h('div', {}, '—'));
       info.appendChild(st);
       info.appendChild(h('div', { class: 'mut', style: 'margin-top:8px' }, 'Coût : ' + n.cost + ' point(s)'));
+      if (n.kind === 'key' && n.cls !== 'core') {
+        const locked = P.keyLocked(cls, id);
+        info.appendChild(h('div', { class: 'mut', style: 'margin-top:6px;color:' + (locked ? '#ff5d6c' : '#c48bff') },
+          locked ? 'Keystone : quota atteint (' + P.keystonesIn(cls) + '/' + P.keystoneCap() + ') — il faut choisir.'
+                 : 'Keystone : ' + P.keystonesIn(cls) + '/' + P.keystoneCap() + ' utilisés sur cet arbre.'));
+      }
       if (owned) info.appendChild(h('button', { disabled: true }, 'Acquis'));
       else {
-        const b = btn('Apprendre (' + n.cost + ')', can ? 'primary' : '', () => { if (!P.canTake(cls, id)) { NX.toast(NX.scopeOf(id) !== 'core' && n.cls !== cls ? 'Branche d’une autre classe' : 'Points ou prérequis manquants', 'bad'); return; } P.allocate(cls, id); showInfo(id); });
+        const b = btn('Apprendre (' + n.cost + ')', can ? 'primary' : '', () => {
+          if (!P.canTake(cls, id)) {
+            const msg = P.keyLocked(cls, id) ? 'Quota de keystones atteint (' + P.keystonesIn(cls) + '/' + P.keystoneCap() + ')'
+              : (NX.scopeOf(id) !== 'core' && n.cls !== cls) ? 'Branche d’une autre classe' : 'Points ou prérequis manquants';
+            NX.toast(msg, 'bad'); return;
+          }
+          P.allocate(cls, id); showInfo(id);
+        });
         if (!can) b.disabled = true; info.appendChild(b);
       }
     }
@@ -573,29 +587,45 @@
      MONTÉE DE NIVEAU
      ============================================================ */
   function levelup(run, choices, onPick) {
-    const el = elLevel(); NX.clear(el); el.classList.remove('hidden');
+    const el = elLevel(); el.classList.remove('hidden');
     const kindLabel = { wnew: 'Nouvelle arme', wup: 'Amélioration', variant: 'Variante', item: 'Objet passif', stat: 'Statistique' };
-    const box = h('div', { class: 'levelup-box' },
-      h('h2', {}, 'NIVEAU ' + run.player.level),
-      h('div', { class: 'sub' }, 'Choisis une amélioration'),
-      h('div', { class: 'choices' }, choices.map(c => {
-        let ic = '✨', nm = '', ds = '', mods = [];
-        if (c.type === 'wnew') { const w = NX.WEAPONS[c.id]; ic = w.ic; nm = 'NOUVELLE ARME — ' + w.n; ds = w.desc; mods = ['Dégâts de base ' + w.base.dmg, 'Mode ' + w.mode]; }
-        else if (c.type === 'wup') { const w = NX.WEAPONS[c.id], own = run.weaponOf(c.id); ic = w.ic; nm = w.n + ' → niv.' + ((own ? own.lvl : 1) + 1); ds = 'Augmente les dégâts et réduit la recharge.'; }
-        else if (c.type === 'variant') { const v = NX.WVARIANT[c.id], w = NX.WEAPONS[c.weapon]; ic = '🔀'; nm = 'VARIANTE — ' + v.n; ds = (w.n + ' : ') + v.d; }
-        else if (c.type === 'item') { const it = NX.ITEMS[c.id]; ic = it.ic; nm = it.n; ds = it.d || 'Objet passif.'; mods = Object.keys(it.stats).map(k => NX.fmtStat(k, it.stats[k]).txt + ' ' + NX.fmtStat(k, it.stats[k]).name); }
-        else { ic = '📈'; nm = 'Amélioration'; ds = 'Bonus permanent.'; mods = Object.keys(c.stats).map(k => NX.fmtStat(k, c.stats[k]).txt + ' ' + NX.fmtStat(k, c.stats[k]).name); }
-        return h('div', { class: 'choice', onclick: () => { el.classList.add('hidden'); onPick(c); } },
-          h('div', { class: 'ic' }, ic),
-          h('div', { class: 'kind' }, kindLabel[c.type] || c.type),
-          h('div', { class: 'nm' }, nm),
-          h('div', { class: 'ds' }, ds),
-          c.type === 'variant' ? h('div', { class: 'mods' }, (NX.WVARIANT[c.id].mods && NX.WVARIANT[c.id].mods.stats) ? Object.keys(NX.WVARIANT[c.id].mods.stats).map(k => NX.fmtStat(k, NX.WVARIANT[c.id].mods.stats[k]).txt + ' ' + NX.fmtStat(k, NX.WVARIANT[c.id].mods.stats[k]).name).join(' · ') : '') : null,
-          h('div', { class: 'mods' }, mods.filter(Boolean).join(' · '))
-        );
-      }))
-    );
-    el.appendChild(box);
+    const fmtMods = m => Object.keys(m || {}).map(k => { const f = NX.fmtStat(k, m[k]); return f.txt + ' ' + f.name; });
+    function draw() {
+      NX.clear(el);
+      const box = h('div', { class: 'levelup-box' },
+        h('h2', {}, 'NIVEAU ' + run.player.level),
+        h('div', { class: 'sub' }, 'Choisis une amélioration' + (run.banishes > 0 ? ' — 🚫 pour écarter définitivement une proposition' : '')),
+        h('div', { class: 'choices' }, run.choices.map(c => {
+          const rar = c.rar == null ? 0 : c.rar;
+          const R = NX.RARITY[Math.min(4, rar)];
+          let ic = '✨', nm = '', ds = '', mods = [];
+          if (c.type === 'wnew') { const w = NX.WEAPONS[c.id]; ic = w.ic; nm = 'NOUVELLE ARME — ' + w.n; ds = w.desc; mods = ['Dégâts ' + w.base.dmg, 'Mode ' + w.mode]; }
+          else if (c.type === 'wup') { const w = NX.WEAPONS[c.id], own = run.weaponOf(c.id); ic = w.ic; nm = w.n + ' → niv.' + ((own ? own.lvl : 1) + 1); ds = 'Augmente les dégâts et réduit la recharge.'; }
+          else if (c.type === 'variant') { const v = NX.WVARIANT[c.id], w = NX.WEAPONS[c.weapon]; ic = '🔀'; nm = 'VARIANTE — ' + v.n; ds = (w.n + ' : ') + v.d; }
+          else if (c.type === 'item') { const it = NX.ITEMS[c.id]; ic = it.ic; nm = it.n; ds = it.d || 'Objet passif.'; mods = fmtMods(it.stats); }
+          else { ic = '📈'; nm = 'Amélioration'; ds = 'Bonus permanent.'; mods = fmtMods(c.stats); }
+          const card = h('div', { class: 'choice rar' + rar, onclick: () => { el.classList.add('hidden'); onPick(c); } },
+            h('div', { class: 'ch-head' },
+              h('div', { class: 'rar-chip ' + R.cls }, R.n),
+              run.banishes > 0 ? h('button', { class: 'ban-btn', title: 'Bannir cette proposition', onclick: ev => { ev.stopPropagation(); if (run.banChoice(c)) draw(); } }, '🚫') : null,
+              h('div', { class: 'ic' }, ic)
+            ),
+            h('div', { class: 'kind' }, kindLabel[c.type] || c.type),
+            h('div', { class: 'nm' }, nm),
+            h('div', { class: 'ds' }, ds),
+            c.type === 'variant' ? h('div', { class: 'mods' }, ((NX.WVARIANT[c.id].mods && NX.WVARIANT[c.id].mods.stats) ? fmtMods(NX.WVARIANT[c.id].mods.stats).join(' · ') : '')) : null,
+            h('div', { class: 'mods' }, mods.filter(Boolean).join(' · '))
+          );
+          return card;
+        })),
+        h('div', { class: 'lv-foot' },
+          h('div', { class: 'lv-meta' }, '🎲 Relances : ' + run.rerolls + '   ·   🚫 Bannissements : ' + run.banishes),
+          h('button', { class: 'btn ghost', disabled: run.rerolls <= 0, onclick: () => { if (run.rerollChoices()) draw(); } }, '🎲 Relancer')
+        )
+      );
+      el.appendChild(box);
+    }
+    draw();
   }
   function closeLevelup() { elLevel().classList.add('hidden'); }
 

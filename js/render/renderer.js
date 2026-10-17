@@ -26,12 +26,39 @@
   }
   function toScreen(x, y) { return { x: x - cam.x + W / 2 + cam.shakeX, y: y - cam.y + H / 2 + cam.shakeY }; }
 
+  /* Halo bon marché : deux disques translucides en mode additif.
+     `ctx.shadowBlur` est bien plus joli mais extrêmement coûteux en Canvas 2D
+     (un flou par appel) — l'utiliser sur des centaines de projectiles fait
+     chuter le framerate. On le remplace partout en jeu. */
+  function glow(x, y, r, color, a) {
+    a = a == null ? 0.3 : a;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = color;
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(x, y, r * 1.9, 0, TAU); ctx.fill();
+    ctx.globalAlpha = a * 1.7;
+    ctx.beginPath(); ctx.arc(x, y, r * 1.1, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
   /* ---------------- fond ---------------- */
   function drawBg(run) {
     const env = NX.ENVS[run.level.env] || NX.ENVS.office;
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, env.g1); g.addColorStop(1, env.g2);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // dégradés mis en cache par environnement (createLinearGradient/Radial à
+    // chaque frame est inutile : les couleurs ne changent pas)
+    if (!env._g) {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, env.g1); g.addColorStop(1, env.g2);
+      env._g = g;
+      const rg = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, 620);
+      rg.addColorStop(0, M.rgba(env.accent, 0.05)); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      env._h = rg;
+      const sg = ctx.createLinearGradient(0, 0, 0, 90);
+      sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(0.5, M.rgba(env.accent, 0.10)); sg.addColorStop(1, 'rgba(0,0,0,0)');
+      env._s = sg;
+    }
+    ctx.fillStyle = env._g; ctx.fillRect(0, 0, W, H);
     // grille
     const cell = 64, ox = ((-cam.x % cell) + cell) % cell, oy = ((-cam.y % cell) + cell) % cell;
     ctx.strokeStyle = M.rgba(env.accent, 0.06); ctx.lineWidth = 1;
@@ -50,13 +77,11 @@
     ctx.globalAlpha = 1;
     // scan vertical qui descend (effet écran de données)
     const scan = (run.time * 55) % (H + 90) - 45;
-    const sg = ctx.createLinearGradient(0, scan, 0, scan + 90);
-    sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(0.5, M.rgba(env.accent, 0.10)); sg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sg; ctx.fillRect(0, scan, W, 90);
+    ctx.save(); ctx.translate(0, scan);
+    ctx.fillStyle = env._s; ctx.fillRect(0, 0, W, 90);
+    ctx.restore();
     // halo central
-    const rg = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, 620);
-    rg.addColorStop(0, M.rgba(env.accent, 0.05)); rg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = env._h; ctx.fillRect(0, 0, W, H);
     // décor
     ctx.save();
     run.props.forEach(pr => {
@@ -177,12 +202,15 @@
     run.pickups.forEach(k => {
       const s = toScreen(k.x, k.y);
       const bob = Math.sin(k.anim * 4) * 3;
+      const y = s.y + bob;
+      const fade = (k.life != null && k.life < 3) ? Math.max(0.1, k.life / 3) : 1;
       ctx.save();
-      if (k.kind === 'xp') { ctx.fillStyle = '#39e6ff'; ctx.shadowColor = '#39e6ff'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(s.x, s.y + bob, 5, 0, TAU); ctx.fill(); }
-      else if (k.kind === 'gold') { ctx.fillStyle = '#ffd479'; ctx.shadowColor = '#ffd479'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(s.x, s.y + bob, 6, 0, TAU); ctx.fill(); ctx.fillStyle = '#8a5a12'; ctx.font = '9px monospace'; ctx.fillText('₡', s.x - 3, s.y + bob + 3); }
-      else if (k.kind === 'hp') { ctx.fillStyle = '#4dff9f'; ctx.shadowColor = '#4dff9f'; ctx.shadowBlur = 12; ART.rr(ctx, s.x - 6, s.y + bob - 6, 12, 12, 3); ctx.fill(); ctx.fillStyle = '#0a111c'; ctx.fillRect(s.x - 4, s.y + bob - 1.5, 8, 3); ctx.fillRect(s.x - 1.5, s.y + bob - 4, 3, 8); }
-      else if (k.kind === 'magnet') { ctx.fillStyle = '#7ff0ff'; ctx.shadowColor = '#7ff0ff'; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(s.x, s.y + bob, 7, 0.4, TAU - 0.4); ctx.lineWidth = 4; ctx.strokeStyle = '#7ff0ff'; ctx.stroke(); }
-      else if (k.kind === 'chest') { ctx.fillStyle = '#ffd479'; ctx.shadowColor = '#ffd479'; ctx.shadowBlur = 16; ART.rr(ctx, s.x - 11, s.y + bob - 8, 22, 16, 4); ctx.fill(); ctx.fillStyle = '#8a5a12'; ctx.fillRect(s.x - 11, s.y + bob - 2, 22, 3); }
+      ctx.globalAlpha = fade;
+      if (k.kind === 'xp') { glow(s.x, y, 5, '#39e6ff', 0.35); ctx.fillStyle = '#39e6ff'; ctx.beginPath(); ctx.arc(s.x, y, 5, 0, TAU); ctx.fill(); }
+      else if (k.kind === 'gold') { glow(s.x, y, 6, '#ffd479', 0.4); ctx.fillStyle = '#ffd479'; ctx.beginPath(); ctx.arc(s.x, y, 6, 0, TAU); ctx.fill(); ctx.fillStyle = '#8a5a12'; ctx.font = '9px monospace'; ctx.fillText('₡', s.x - 3, y + 3); }
+      else if (k.kind === 'hp') { glow(s.x, y, 6, '#4dff9f', 0.4); ctx.fillStyle = '#4dff9f'; ART.rr(ctx, s.x - 6, y - 6, 12, 12, 3); ctx.fill(); ctx.fillStyle = '#0a111c'; ctx.fillRect(s.x - 4, y - 1.5, 8, 3); ctx.fillRect(s.x - 1.5, y - 4, 3, 8); }
+      else if (k.kind === 'magnet') { glow(s.x, y, 7, '#7ff0ff', 0.45); ctx.strokeStyle = '#7ff0ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(s.x, y, 7, 0.4, TAU - 0.4); ctx.stroke(); }
+      else if (k.kind === 'chest') { glow(s.x, y, 12, '#ffd479', 0.5); ctx.fillStyle = '#ffd479'; ART.rr(ctx, s.x - 11, y - 8, 22, 16, 4); ctx.fill(); ctx.fillStyle = '#8a5a12'; ctx.fillRect(s.x - 11, y - 2, 22, 3); }
       ctx.restore();
     });
   }
@@ -206,30 +234,31 @@
       }
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       // forme selon le type de dégâts
+      glow(s.x, s.y, p.size * 0.65, col, 0.4);
       if (p.dmgType === 'pierce') {
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+        ctx.fillStyle = col;
         ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(p.vy, p.vx));
         ctx.beginPath(); ctx.moveTo(-p.size * 0.6, -p.size * 0.5); ctx.lineTo(p.size * 0.9, 0); ctx.lineTo(-p.size * 0.6, p.size * 0.5); ctx.closePath(); ctx.fill();
         ctx.restore();
       } else if (p.dmgType === 'thermal') {
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 14;
+        ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.6, 0, TAU); ctx.fill();
         ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 1.4, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
       } else if (p.dmgType === 'emp') {
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12;
+        ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
         ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 1.1, 0, TAU); ctx.stroke();
       } else if (p.dmgType === 'corrosion') {
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+        ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.55, 0, TAU); ctx.fill();
         ctx.strokeStyle = '#0a111c'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.55, 0, TAU); ctx.stroke();
       } else if (p.dmgType === 'void') {
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16;
+        ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
         ctx.globalAlpha = 0.5; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.9, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
       } else {
         // kinetic : disque métallique
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+        ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.stroke();
       }
@@ -237,7 +266,10 @@
     });
     run.eshots.forEach(p => {
       const s = toScreen(p.x, p.y);
-      ctx.save(); ctx.fillStyle = p.color || '#ff5d6c'; ctx.shadowColor = p.color || '#ff5d6c'; ctx.shadowBlur = 8;
+      const col = p.color || '#ff5d6c';
+      ctx.save();
+      glow(s.x, s.y, p.size * 0.5, col, 0.35);
+      ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(s.x, s.y, p.size * 0.5, 0, TAU); ctx.fill();
       ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(s.x, s.y, p.size, 0, TAU); ctx.fill(); ctx.restore();
     });
@@ -249,7 +281,7 @@
     const ps = toScreen(p.x, p.y);
     run.player.weapons.forEach(w => {
       const def = NX.WEAPONS[w.id]; if (!def) return;
-      const res = NX.resolveWeapon(w.id, w.variant, w.lvl, run.stats);
+      const res = w._res || NX.resolveWeapon(w.id, w.variant, w.lvl, run.stats);
       const col = NX.DMSG[res.dmgType] ? NX.DMSG[res.dmgType].c : '#8bff6b';
       if (def.mode === 'aura') {
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -274,7 +306,8 @@
           ctx.beginPath(); ctx.arc(ps.x, ps.y, res.range, 0, TAU);
           ctx.strokeStyle = M.rgba(col, 0.08); ctx.lineWidth = 1; ctx.stroke();
           // orbe avec halo
-          ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 14;
+          glow(ox, oy, res.size * 0.6, col, 0.4);
+          ctx.fillStyle = col;
           ctx.beginPath(); ctx.arc(ox, oy, res.size * 0.6, 0, TAU); ctx.fill();
           ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(ox, oy, res.size, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
           ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox, oy, res.size * 0.35, 0, TAU); ctx.stroke();
@@ -367,17 +400,21 @@
   /* ---------------- effets ---------------- */
   function drawFx() {
     const read = NX.profile.d.settings.readability;
-    const parts = NX.profile.d.settings.particles;
-    fx.list.forEach(f => {
+    const l = fx.list;
+    if (!l.length) return;
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    for (let i = 0; i < l.length; i++) {
+      const f = l[i];
+      if (read && (f.kind === 'spark' || f.kind === 'boom')) continue;
       const t = f.t / f.dur;
-      if (read && (f.kind === 'spark' || f.kind === 'boom')) return;
       const s = toScreen(f.x, f.y);
-      ctx.save();
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       if (f.kind === 'slash' || f.kind === 'arc') {
-        ctx.globalAlpha = 1 - t; ctx.translate(s.x, s.y); ctx.rotate(f.ang || 0);
+        ctx.save(); ctx.globalAlpha = 1 - t; ctx.translate(s.x, s.y); ctx.rotate(f.ang || 0);
         ctx.strokeStyle = f.color; ctx.lineWidth = 6 * (1 - t * 0.6);
         const arc = f.kind === 'arc' ? (f.arc || 1.6) : 1.9;
         ctx.beginPath(); ctx.arc(0, 0, (f.size || 60) * (0.7 + t * 0.4), -arc / 2, arc / 2); ctx.stroke();
+        ctx.restore();
       } else if (f.kind === 'ring' || f.kind === 'nova') {
         ctx.globalAlpha = (1 - t) * 0.9; ctx.strokeStyle = f.color; ctx.lineWidth = (f.kind === 'nova' ? 8 : 4) * (1 - t);
         ctx.beginPath(); ctx.arc(s.x, s.y, (f.size || 30) * (f.kind === 'nova' ? (0.3 + t) : t), 0, TAU); ctx.stroke();
@@ -392,11 +429,12 @@
       } else if (f.kind === 'bolt') {
         ctx.globalAlpha = 1 - t; ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = f.color; ctx.lineWidth = 3;
         ctx.beginPath();
-        (f.seg || []).forEach((pt, i) => { const q = toScreen(pt.x, pt.y); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+        const seg = f.seg || [];
+        for (let k = 0; k < seg.length; k++) { const q = toScreen(seg[k].x, seg[k].y); k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
         ctx.stroke();
       } else if (f.kind === 'beam') {
-        ctx.globalAlpha = (1 - t) * 0.9; ctx.globalCompositeOperation = 'lighter';
-        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(f.ang || 0);
+        ctx.save(); ctx.globalAlpha = (1 - t) * 0.9; ctx.globalCompositeOperation = 'lighter';
+        ctx.translate(s.x, s.y); ctx.rotate(f.ang || 0);
         const gg = ctx.createLinearGradient(0, 0, f.len, 0);
         gg.addColorStop(0, M.rgba(f.color, 0.9)); gg.addColorStop(1, M.rgba(f.color, 0));
         ctx.fillStyle = gg; ctx.fillRect(0, -(f.w || 8) / 2, f.len, f.w || 8); ctx.restore();
@@ -408,16 +446,19 @@
       } else if (f.kind === 'dash') {
         ctx.globalAlpha = (1 - t) * 0.5; ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(s.x, s.y, 16 * (1 - t), 0, TAU); ctx.fill();
       }
-      ctx.restore();
-    });
-    void parts;
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 
   /* ---------------- vignette (lisibilité) ---------------- */
+  let vigGrad = null;
   function vignette() {
-    const g = ctx.createRadialGradient(W / 2, H / 2, 260, W / 2, H / 2, 720);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (!vigGrad) {
+      const g = ctx.createRadialGradient(W / 2, H / 2, 260, W / 2, H / 2, 720);
+      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
+      vigGrad = g;
+    }
+    ctx.fillStyle = vigGrad; ctx.fillRect(0, 0, W, H);
   }
 
   const render = {

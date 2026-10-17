@@ -53,6 +53,16 @@
   /* purge les nœuds de talent qui n'existent plus (refonte d'arbre) et rend les points */
   function pruneTalents() {
     if (!NX.TALENTS || !data) return;
+    // migration : les branches transversales (x*) sont désormais regroupées
+    // dans une portée globale 'x' (accessibles à toutes les classes)
+    for (const c in data.talents.byClass) {
+      if (c.charAt(0) === 'x' && c !== 'x') {
+        const sc = data.talents.byClass[c];
+        const dst = data.talents.byClass.x = data.talents.byClass.x || {};
+        for (const k in sc) dst[k] = 1;
+        delete data.talents.byClass[c];
+      }
+    }
     let refund = 0;
     const prune = sc => { for (const id in sc) { if (!NX.TALENTS.nodes[id]) { refund += 1; delete sc[id]; } } };
     prune(data.talents.core);
@@ -120,9 +130,10 @@
       const moves = this.nodeMoves(nd);
       return moves;
     },
-    // renvoie pour chaque scope d'un nœud : 'owned' | 'avail' | 'can' | 'locked'
+    // renvoie pour chaque scope d'un nœud : 'owned' | 'can' | 'locked'
+    // (le scope réel d'un nœud transversal est 'x', pas son id de classe)
     nodeMoves(nd) {
-      const scopes = nd.cls === 'core' ? ['core'] : [nd.cls];
+      const scopes = [NX.scopeOf(nd.id)];
       const out = {};
       scopes.forEach(sc => {
         const alloc = this.scopeAlloc(sc);
@@ -137,9 +148,11 @@
       const alloc = this.scopeAlloc(sc);
       if (alloc[id]) return false;
       // une branche de classe n'est ouverte que pour SA classe
-      if (nd.cls !== 'core' && nd.cls !== sc) return false;
+      // (le tronc commun et les branches transversales sont globaux)
+      if (nd.cls !== 'core' && nd.cls.charAt(0) !== 'x' && nd.cls !== sc) return false;
       if (!NX.talentAvail(id, alloc)) return false;
       if (data.points < nd.cost) return false;
+      if (!this.keystoneAllowed(cls, id)) return false;
       data.points -= nd.cost; alloc[id] = 1; this.save();
       NX.bus.emit('talent:alloc', { id, cls }); return true;
     },
@@ -147,10 +160,34 @@
     canTake(cls, id) {
       const nd = NX.TALENTS.nodes[id]; if (!nd) return false;
       const sc = NX.scopeOf(id);
-      if (nd.cls !== 'core' && nd.cls !== cls) return false;
+      if (nd.cls !== 'core' && nd.cls.charAt(0) !== 'x' && nd.cls !== cls) return false;
       const alloc = this.scopeAlloc(sc);
-      return !alloc[id] && NX.talentAvail(id, alloc) && data.points >= nd.cost;
+      return !alloc[id] && NX.talentAvail(id, alloc) && data.points >= nd.cost && this.keystoneAllowed(cls, id);
     },
+    /* ---------- keystones : on ne peut pas tous les prendre ----------
+       L'arbre est plus grand que ce qu'un build peut absorber : il faut
+       choisir. Chaque arbre de classe n'autorise qu'un nombre limité de
+       keystones (le keystone du tronc commun est hors quota). */
+    KEYSTONE_CAP: 2,
+    keystoneCap() { return this.KEYSTONE_CAP; },
+    keystonesIn(cls) {
+      let n = 0;
+      // keystones transversaux (globaux) : portée 'x'
+      const xa = data.talents.byClass.x || {};
+      for (const id in xa) { const nd = NX.TALENTS.nodes[id]; if (nd && nd.kind === 'key') n++; }
+      // keystone de la branche de classe
+      const bc = data.talents.byClass[cls] || {};
+      for (const id in bc) { const nd = NX.TALENTS.nodes[id]; if (nd && nd.kind === 'key' && nd.cls !== 'core') n++; }
+      return n;
+    },
+    keyLocked(cls, id) {
+      const nd = NX.TALENTS.nodes[id];
+      if (!nd || nd.kind !== 'key' || nd.cls === 'core') return false;
+      const alloc = this.scopeAlloc(NX.scopeOf(id));
+      if (alloc[id]) return false;
+      return this.keystonesIn(cls) >= this.keystoneCap();
+    },
+    keystoneAllowed(cls, id) { return !this.keyLocked(cls, id); },
     respecCost(cls) {
       const alloc = data.talents.byClass[cls] || {};
       const spent = Object.keys(alloc).reduce((s, id) => s + (NX.TALENTS.nodes[id] ? NX.TALENTS.nodes[id].cost : 0), 0);

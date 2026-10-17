@@ -143,7 +143,7 @@ hr{border:none;border-top:1px solid var(--line);margin:16px 0}
 .levelup-box h2{font-family:var(--mono);letter-spacing:5px;color:var(--accent);margin-bottom:8px;
   text-shadow:var(--glow-accent)}
 .levelup-box .sub{color:var(--dim);margin-bottom:24px;font-size:13px;letter-spacing:.5px}
-.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .choice{cursor:pointer;text-align:left;border:1px solid var(--line2);border-radius:16px;padding:18px;
   background:linear-gradient(180deg,rgba(16,26,42,0.9),rgba(10,17,28,0.9));
   transition:.2s;position:relative;overflow:hidden}
@@ -156,6 +156,23 @@ hr{border:none;border-top:1px solid var(--line);margin:16px 0}
 .choice .ds{font-size:13px;color:var(--dim);line-height:1.6;min-height:64px}
 .choice .mods{margin-top:10px;font-size:12px;font-family:var(--mono);color:var(--good)}
 .choice .mods .neg{color:var(--bad)}
+/* en-tête de carte : rareté + bouton bannir + icône */
+.choice .ch-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.choice .rar-chip{font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;font-weight:700}
+.choice .ch-head .ic{float:none;margin-left:auto;font-size:30px}
+.ban-btn{width:28px;height:28px;padding:0;border-radius:8px;font-size:13px;line-height:1;display:grid;place-items:center;
+  background:rgba(20,10,14,0.75);border:1px solid #57232f;color:#ffb3bd;cursor:pointer;transition:.15s}
+.ban-btn:hover{background:#3a1420;border-color:var(--bad);color:#fff;box-shadow:var(--glow-bad)}
+/* teinte de la bordure selon la rareté */
+.choice.rar0{border-color:#38485e}
+.choice.rar1{border-color:#1c5a7a;box-shadow:0 0 22px rgba(92,200,255,0.10)}
+.choice.rar2{border-color:#5b2f8a;box-shadow:0 0 26px rgba(178,107,255,0.18)}
+.choice.rar3{border-color:#8a5a12;box-shadow:0 0 32px rgba(255,176,58,0.24)}
+.choice.rar4{border-color:#8a1f4a;box-shadow:0 0 36px rgba(255,77,148,0.30)}
+/* pied de la fenêtre de montée de niveau (relance / bannissement) */
+.lv-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px}
+.lv-meta{font-family:var(--mono);font-size:12.5px;color:var(--dim);letter-spacing:.4px}
+.lv-foot .btn{min-width:170px}
 
 /* ---------- cinématique ---------- */
 #cine{display:flex;flex-direction:column;justify-content:flex-end;background:#010309ee}

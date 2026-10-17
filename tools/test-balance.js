@@ -30,7 +30,7 @@ function setup(level) {
   if (level === 'zero') return;   // profil du tout premier lancement : rien
   NX.profile.unlock('talents');
   NX.profile.unlock('variants'); NX.profile.unlock('loadout'); NX.profile.unlock('shop'); NX.profile.unlock('forge');
-  const scopes = level === 'vet' ? ['core', 'compilateur', 'daemon', 'reseau', 'optimiseur', 'virus', 'materiel', 'x1', 'x2'] : ['core'];
+  const scopes = level === 'vet' ? ['core', 'compilateur', 'daemon', 'reseau', 'optimiseur', 'virus', 'materiel', 'x'] : ['core'];
   scopes.forEach(sc => {
     let g = 0;
     while (g++ < 500) {

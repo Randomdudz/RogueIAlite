@@ -241,6 +241,28 @@ step('purge d’un nœud de talent disparu', () => {
   if (NX.profile.d.talents.core['t_inexistant_42']) throw new Error('nœud inconnu conservé');
   if (NX.profile.d.points !== p + 1) throw new Error('point non remboursé');
 });
+step('branches transversales accessibles', () => {
+  const P = NX.profile;
+  P.d.talents = { core: {}, byClass: {} }; P.d.points = 999;
+  const xid = NX.TALENTS.all.find(id => NX.isTransversal(id) && NX.TALENTS.nodes[id].req.length === 0);
+  if (!xid) throw new Error('aucun nœud transversal racine');
+  if (NX.scopeOf(xid) !== 'x') throw new Error('transversal non global (scope attendu « x »)');
+  if (!P.canTake('compilateur', xid)) throw new Error('transversal inaccessible depuis la classe');
+  if (!P.allocate('compilateur', xid)) throw new Error('allocation transversal refusée');
+  P.d.talents = { core: {}, byClass: {} }; P.d.points = 0;
+});
+step('plafond de keystones (choix de build)', () => {
+  const P = NX.profile;
+  const keys = NX.TALENTS.all.filter(id => { const n = NX.TALENTS.nodes[id]; return n.kind === 'key' && (NX.scopeOf(id) === 'x' || NX.scopeOf(id) === 'compilateur'); });
+  if (keys.length < 3) throw new Error('pas assez de keystones pour tester');
+  P.d.talents = { core: {}, byClass: {} }; P.d.points = 999;
+  const put = id => { const sc = NX.scopeOf(id); if (sc === 'core') P.d.talents.core[id] = 1; else (P.d.talents.byClass[sc] = P.d.talents.byClass[sc] || {})[id] = 1; };
+  put(keys[0]); put(keys[1]);
+  if (P.keystonesIn('compilateur') !== 2) throw new Error('comptage keystones erroné : ' + P.keystonesIn('compilateur'));
+  if (!P.keyLocked('compilateur', keys[2])) throw new Error('quota de keystones non appliqué');
+  if (P.keystoneAllowed('compilateur', keys[2])) throw new Error('keystoneAllowed devrait être faux au-delà du quota');
+  P.d.talents = { core: {}, byClass: {} }; P.d.points = 0;
+});
 
 // une vraie partie
 function autoPick() {
@@ -260,10 +282,29 @@ step('20 s de jeu', () => {
 step('montée de niveau forcée', () => { const r = NX.main.run; r.pending += 1; r.openLevelUp(); });
 frame(16.7);
 step('interface de montée de niveau', () => { const el = registry.levelup; if (!el || !el.children.length) throw new Error('interface vide'); });
+step('rareté des propositions', () => {
+  const r = NX.main.run;
+  if (!r.choices.length) throw new Error('aucune proposition');
+  if (!r.choices.every(c => typeof c.rar === 'number')) throw new Error('rareté non renseignée');
+});
+step('relance des propositions (roll)', () => {
+  const r = NX.main.run, before = r.rerolls;
+  if (!r.rerollChoices()) throw new Error('relance refusée');
+  if (r.rerolls !== before - 1) throw new Error('relance non décomptée');
+  if (!r.choices.length) throw new Error('relance sans proposition');
+});
+step('bannissement d’une proposition (ban)', () => {
+  const r = NX.main.run, c = r.choices[0], key = r.banKey(c), before = r.banishes;
+  if (!r.banChoice(c)) throw new Error('bannissement refusé');
+  if (r.banishes !== before - 1) throw new Error('ban non décompté');
+  if (!r.banned[key]) throw new Error('clé non mémorisée');
+  if (r.choices.some(x => r.banKey(x) === key)) throw new Error('proposition bannie encore proposée');
+});
 step('choix d’une amélioration', () => { const el = registry.levelup; const b = hasClick(el); if (!b) throw new Error('aucun choix cliquable'); b.dispatchEvent({ type: 'click', preventDefault() { } }); });
 step('pause', () => NX.main.togglePause());
 step('reprise', () => NX.main.togglePause());
 step('30 s après montée', () => play(1800));
+step('plafond d’armes respecté', () => { const r = NX.main.run; if (r.player.weapons.length > 4) throw new Error('trop d’armes équipées : ' + r.player.weapons.length); });
 step('boss', () => { const r = NX.main.run; if (!r) throw new Error('pas de run'); r.time = r.level.dur - 0.05; play(20); if (!r.bossSpawned) throw new Error('boss non apparu (état=' + r.state + ' t=' + r.time.toFixed(1) + ' dur=' + r.level.dur + ')'); });
 step('écran de fin de run (victoire)', () => { const r = NX.main.run; r.state = 'won'; NX.main.onWin(r); });
 advanceCinematic(60);
