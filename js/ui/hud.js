@@ -19,7 +19,7 @@
       h('div', { class: 'hud-top' },
         h('div', { class: 'hud-xp' },
           h('div', { class: 'bar hp' }, h('i'), h('span', { class: 'hp-t' })),
-          h('div', { class: 'bar xp', style: 'margin-top:6px;height:9px' }, h('i'), h('span', { class: 'xp-t' }))
+          h('div', { class: 'bar xp' }, h('i'), h('span', { class: 'xp-t' }))
         ),
         h('div', { class: 'grow' }),
         h('div', { style: 'text-align:center' },
@@ -52,10 +52,14 @@
     const p = run.player, st = run.stats;
     const hpPct = M.clamp(p.hp / p.maxHp, 0, 1);
     refs.hpI.style.width = (hpPct * 100) + '%';
-    refs.hpT.textContent = Math.ceil(p.hp) + ' / ' + Math.round(p.maxHp) + (p.revives ? '   ♻'.repeat(0) + '  (' + p.revives + ' réanim.)' : '');
+    // couleur dynamique : vert → jaune → rouge (lisibilité de l'état du héros)
+    const hpcol = hpPct > 0.5 ? '#3ddc84' : hpPct > 0.25 ? '#ffd479' : '#ff4d6a';
+    refs.hpI.style.background = 'linear-gradient(90deg,' + M.mix(hpcol, '#ffffff', 0.18) + ',' + hpcol + ')';
+    refs.hpI.style.boxShadow = '0 0 10px ' + M.rgba(hpcol, 0.6);
+    refs.hpT.textContent = Math.ceil(p.hp) + ' / ' + Math.round(p.maxHp) + (p.revives ? '  (' + p.revives + ' réanim.)' : '');
     const xpPct = M.clamp(p.xp / p.xpNeed, 0, 1);
     refs.xpI.style.width = (xpPct * 100) + '%';
-    refs.xpT.textContent = 'Niveau ' + p.level + ' — ' + Math.floor(xpPct * 100) + '%';
+    refs.xpT.textContent = 'NIVEAU ' + p.level + ' — ' + Math.floor(xpPct * 100) + '%  ·  ' + Math.floor(p.xp) + ' / ' + p.xpNeed + ' data';
 
     const remaining = run.bossSpawned ? 0 : Math.max(0, run.level.dur - run.time);
     refs.timer.textContent = M.clock(run.bossSpawned ? run.time : remaining);
@@ -108,7 +112,7 @@
       if (!refs._bname || refs._bname !== b.name) {
         NX.clear(refs.boss);
         refs.boss.appendChild(h('div', { style: 'text-align:center;font-family:Consolas,monospace;letter-spacing:2px;color:#ff4d94;margin-bottom:4px' }, '⚠ ' + b.name));
-        refs.boss.appendChild(h('div', { class: 'bar boss', style: 'height:16px' }, h('i'), h('span', { class: 'bt' })));
+        refs.boss.appendChild(h('div', { class: 'bar boss', style: 'height:20px' }, h('i'), h('span', { class: 'bt' })));
         refs._bname = b.name; refs._bi = refs.boss.querySelector('.bar.boss i'); refs._bt = refs.boss.querySelector('.bt');
       }
       refs._bi.style.width = (M.clamp(b.hp / b.maxHp, 0, 1) * 100) + '%';
