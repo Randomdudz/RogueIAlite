@@ -220,12 +220,13 @@ step('respec', () => NX.profile.respec('core'));
 
 // économie méta : Crédits → point de talent
 step('conversion crédits → point de talent', () => {
-  NX.profile.d.credits = 1000;
-  const before = NX.profile.d.points;
+  NX.profile.d.credits = 1000; NX.profile.d.pointsBought = 0;
+  const before = NX.profile.d.points, cost = NX.profile.pointCost();
   const r = NX.profile.buyTalentPoint();
   if (!r.ok) throw new Error('achat refusé');
   if (NX.profile.d.points !== before + 1) throw new Error('point non crédité');
-  if (NX.profile.d.credits !== 1000 - NX.profile.pointCost()) throw new Error('crédits non débités');
+  if (NX.profile.d.credits !== 1000 - cost) throw new Error('crédits non débités');
+  if (NX.profile.pointCost() <= cost) throw new Error('le coût ne progresse pas');
 });
 step('achat refusé sans crédits', () => {
   NX.profile.d.credits = 0;

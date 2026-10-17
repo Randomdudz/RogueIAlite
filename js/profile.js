@@ -13,7 +13,7 @@
     v: SCHEMA,
     user: { id: 'local', name: 'Invité', guest: true },
     createdAt: Date.now(), updatedAt: Date.now(), playtime: 0,
-    level: 1, xp: 0, points: 0,
+    level: 1, xp: 0, points: 0, pointsBought: 0,
     talents: { core: {}, byClass: {} },
     classes: {},                       // { cls:{ plays, best, cleared, deepestLevel } }
     progress: { unlocked: 1, cleared: {}, endings: {} },
@@ -99,14 +99,17 @@
       return up;
     },
     addPoints(n) { data.points += Math.max(0, n); NX.bus.emit('talents:points', data.points); },
-    /* conversion Crédits → point de talent (monnaie unique méta) */
-    pointCost() { return 150; },
+    /* conversion Crédits → point de talent (monnaie unique méta)
+       coût progressif : 150, 175, 200… +25 par achat, plafonné à 500 */
+    pointCost() { return Math.min(150 + 25 * (data.pointsBought || 0), 500); },
     buyTalentPoint() {
       const c = this.pointCost();
       if (data.credits < c) return { ok: false, need: c - data.credits };
-      data.credits -= c; data.points += 1; this.save();
+      data.credits -= c; data.points += 1; data.pointsBought = (data.pointsBought || 0) + 1;
       NX.bus.emit('talents:points', data.points);
-      return { ok: true };
+      NX.bus.emit('credits:buy', c);
+      this.save();
+      return { ok: true, cost: c };
     },
 
     /* ---------- arbre de talents ---------- */
