@@ -344,6 +344,23 @@
     ctx.fillText(p.level, bx - 13, by + bh / 2 + 4);
     ctx.restore();
 
+    // ---- barre d'expérience sous le personnage (fine, blanche) ----
+    const xpPct = M.clamp(p.xp / p.xpNeed, 0, 1);
+    const xw = 46, xh = 4;
+    const xx = s.x - xw / 2, xy = s.y + p.r * 1.75;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ART.rr(ctx, xx - 1.5, xy - 1.5, xw + 3, xh + 3, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ART.rr(ctx, xx, xy, xw, xh, 2); ctx.fill();
+    if (xpPct > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 6;
+      ART.rr(ctx, xx, xy, Math.max(2, xw * xpPct), xh, 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    ctx.restore();
+
     if (p.stunT > 0) { ctx.save(); ctx.globalAlpha = 0.8; ctx.fillStyle = '#ccd6e0'; ctx.font = '16px sans-serif'; ctx.fillText('⛔', s.x - 8, s.y - 40); ctx.restore(); }
   }
 
