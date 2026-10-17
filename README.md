@@ -55,6 +55,7 @@ server/server.js           — serveur Node optionnel (comptes + sauvegarde + cl
 tools/test-load.js         — test headless : charge le jeu, simule monstres/boss/armes/niveaux
 tools/test-balance.js      — bot de simulation pour l'équilibrage (les 20 niveaux × profils méta)
 tools/test-dom.js          — test de fumée : DOM simulé, exerce tous les écrans + une run complète
+tools/test-talents.js      — géométrie de l'arbre de talents (aucun nœud superposé, tout est visible)
 DESIGN.md                  — lore, 3 fins, équilibrage ~100 h, contenu détaillé
 ```
 
@@ -66,6 +67,7 @@ Le jeu est fait de scripts classiques : on peut l'exécuter hors navigateur pour
 node tools/test-load.js                        # structure : 39 monstres, 21 boss, 85 armes, 20 niveaux
 node tools/test-balance.js compilateur vet      # équilibrage : bot sur les 20 niveaux (vet|normal|zero)
 node tools/test-dom.js                          # fumée : DOM simulé, tous les écrans + une run complète
+node tools/test-talents.js                      # arbre : géométrie (pas de chevauchement, tout visible)
 ```
 
 `test-load` et `test-balance` chargent les scripts dans un `vm` avec un DOM minimal ;
@@ -94,7 +96,7 @@ requête n'est émise. Les icônes d'UI sont des SVG inline/CSS.
 
 - [x] Boucle de jeu, input ZQSD, visée auto, caméra
 - [x] 6 classes, armes + variantes + évolutions, 57 objets passifs
-- [x] Arbre de talents 193 nœuds (style PoE) + stats agrégées
+- [x] Arbre de talents 104 nœuds (style PoE) + stats agrégées
 - [x] 39 monstres, 20 patrons d'IA, 20 niveaux, 21 boss
 - [x] Montées de niveau en combat (choix de sorts/variantes/objets), pickups
 - [x] Méta-progression, boutique, forgeron, codex, arbre, classement

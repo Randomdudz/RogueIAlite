@@ -218,6 +218,29 @@ for (let i = 1; i <= 4; i++) step('écran de fin ' + i, () => NX.screens.endingR
 step('allocation talent', () => { NX.profile.unlock('talents'); NX.profile.d.points = 20; const id = NX.TALENTS.all.find(x => NX.scopeOf(x) === 'core'); NX.profile.allocate('core', id); });
 step('respec', () => NX.profile.respec('core'));
 
+// économie méta : Crédits → point de talent
+step('conversion crédits → point de talent', () => {
+  NX.profile.d.credits = 1000;
+  const before = NX.profile.d.points;
+  const r = NX.profile.buyTalentPoint();
+  if (!r.ok) throw new Error('achat refusé');
+  if (NX.profile.d.points !== before + 1) throw new Error('point non crédité');
+  if (NX.profile.d.credits !== 1000 - NX.profile.pointCost()) throw new Error('crédits non débités');
+});
+step('achat refusé sans crédits', () => {
+  NX.profile.d.credits = 0;
+  if (NX.profile.buyTalentPoint().ok) throw new Error('achat accepté sans crédits');
+});
+step('purge d’un nœud de talent disparu', () => {
+  NX.profile.d.talents.core['t_inexistant_42'] = 1;
+  NX.profile.d.credits = 0;
+  const p = NX.profile.d.points;
+  NX.store.set('profile', NX.profile.d);
+  NX.profile.load();
+  if (NX.profile.d.talents.core['t_inexistant_42']) throw new Error('nœud inconnu conservé');
+  if (NX.profile.d.points !== p + 1) throw new Error('point non remboursé');
+});
+
 // une vraie partie
 function autoPick() {
   const el = registry.levelup;
@@ -244,6 +267,9 @@ step('boss', () => { const r = NX.main.run; if (!r) throw new Error('pas de run'
 step('écran de fin de run (victoire)', () => { const r = NX.main.run; r.state = 'won'; NX.main.onWin(r); });
 advanceCinematic(60);
 step('écran de fin de run (mort)', () => { const r = NX.main.run; r.state = 'dead'; NX.main.onDead(r); });
+step('méta ouverte après une run', () => {
+  ['talents', 'shop', 'forge', 'loadout'].forEach(f => { if (!NX.profile.d.unlocks[f]) throw new Error('déblocage manquant : ' + f); });
+});
 step('abandon de run', () => NX.main.quitRun());
 
 // audio

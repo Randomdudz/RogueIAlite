@@ -50,11 +50,28 @@
     return out;
   }
 
+  /* purge les nœuds de talent qui n'existent plus (refonte d'arbre) et rend les points */
+  function pruneTalents() {
+    if (!NX.TALENTS || !data) return;
+    let refund = 0;
+    const prune = sc => { for (const id in sc) { if (!NX.TALENTS.nodes[id]) { refund += 1; delete sc[id]; } } };
+    prune(data.talents.core);
+    for (const c in data.talents.byClass) prune(data.talents.byClass[c]);
+    if (refund) data.points += refund;
+  }
+  /* ouvre la méta (talents, marchand, forge) dès la première run terminée */
+  function ensureMetaUnlocks() {
+    if (!data) return;
+    if (data.stats.runs >= 1 || data.stats.wins >= 1) {
+      ['talents', 'shop', 'forge', 'loadout'].forEach(f => { data.unlocks[f] = true; });
+    }
+  }
+
   const profile = {
     get d() { return data; },
 
     /* ---------- cycle de vie ---------- */
-    load() { data = migrate(NX.store.get(KEY, null) || null); return data; },
+    load() { data = migrate(NX.store.get(KEY, null) || null); pruneTalents(); ensureMetaUnlocks(); return data; },
     reset(keepUser) {
       const u = data && keepUser ? data.user : null;
       data = DEFAULT(); if (u) data.user = u;
@@ -82,6 +99,15 @@
       return up;
     },
     addPoints(n) { data.points += Math.max(0, n); NX.bus.emit('talents:points', data.points); },
+    /* conversion Crédits → point de talent (monnaie unique méta) */
+    pointCost() { return 150; },
+    buyTalentPoint() {
+      const c = this.pointCost();
+      if (data.credits < c) return { ok: false, need: c - data.credits };
+      data.credits -= c; data.points += 1; this.save();
+      NX.bus.emit('talents:points', data.points);
+      return { ok: true };
+    },
 
     /* ---------- arbre de talents ---------- */
     scopeAlloc(scope) { return scope === 'core' ? data.talents.core : (data.talents.byClass[scope] = data.talents.byClass[scope] || {}); },
@@ -124,7 +150,7 @@
     },
     respecCost(cls) {
       const alloc = data.talents.byClass[cls] || {};
-      const spent = Object.keys(alloc).reduce((s, id) => s + NX.TALENTS.nodes[id].cost, 0);
+      const spent = Object.keys(alloc).reduce((s, id) => s + (NX.TALENTS.nodes[id] ? NX.TALENTS.nodes[id].cost : 0), 0);
       return Math.round(80 + spent * 12);
     },
     respec(cls) {
@@ -132,13 +158,13 @@
       if (data.credits < cost) return { ok: false, need: cost - data.credits };
       let refund = 0;
       const alloc = data.talents.byClass[cls] || {};
-      for (const id in alloc) refund += NX.TALENTS.nodes[id].cost;
+      for (const id in alloc) if (NX.TALENTS.nodes[id]) refund += NX.TALENTS.nodes[id].cost;
       data.credits -= cost; data.points += refund; data.talents.byClass[cls] = {};
       this.save(); NX.bus.emit('talent:respec', { cls }); return { ok: true, refund };
     },
     spentPoints(cls) {
-      const core = Object.keys(data.talents.core).reduce((s, id) => s + NX.TALENTS.nodes[id].cost, 0);
-      const bc = Object.keys(data.talents.byClass[cls] || {}).reduce((s, id) => s + NX.TALENTS.nodes[id].cost, 0);
+      const core = Object.keys(data.talents.core).reduce((s, id) => s + (NX.TALENTS.nodes[id] ? NX.TALENTS.nodes[id].cost : 0), 0);
+      const bc = Object.keys(data.talents.byClass[cls] || {}).reduce((s, id) => s + (NX.TALENTS.nodes[id] ? NX.TALENTS.nodes[id].cost : 0), 0);
       return core + bc;
     },
 
@@ -194,6 +220,8 @@
       st.deepestLevel = Math.max(st.deepestLevel || 0, info.reached || 0);
       data.stats.runs++;
       if (info.win) data.stats.wins++;
+      // la méta (talents, marchand, forge) s'ouvre dès la première run terminée
+      if (data.stats.runs === 1) ['talents', 'shop', 'forge', 'loadout'].forEach(f => this.unlock(f));
       data.stats.kills += info.kills || 0;
       data.stats.bossKills += info.bossKills || 0;
       data.stats.time += info.time || 0;

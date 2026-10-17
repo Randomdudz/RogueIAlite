@@ -221,6 +221,7 @@
   /* ============================================================
      ARBRE DE TALENTS (canvas, pan/zoom)
      ============================================================ */
+  let tCleanup = null;
   function talents(cls) {
     const nd = NX.TALENTS.nodes;
     const wrap = h('div', { class: 'screen', id: 'talents' });
@@ -228,7 +229,14 @@
       h('h1', {}, 'ARBRE DE TALENTS'),
       h('div', { class: 'spacer' }),
       h('div', { class: 'points' }, P.d.points + ' pts'),
+      h('div', { class: 'points', style: 'color:#ffd479' }, '₡ ' + M.fmt(P.d.credits)),
       btn('Arbre de : ' + NX.CLASSES[cls].n, 'sm', () => { pickClass(); }),
+      btn('+1 point (' + P.pointCost() + '₡)', 'sm', () => {
+        const r = P.buyTalentPoint();
+        if (!r.ok) { NX.toast('Il manque ' + M.fmt(r.need) + ' crédits', 'bad'); return; }
+        NX.toast('+1 point de talent', 'good'); talents(cls);
+      }),
+      btn('⤢ Recentrer', 'sm', () => { fit(); draw(); }),
       btn('Respec (' + P.respecCost(cls) + '₡)', 'sm', () => { const r = P.respec(cls); if (!r.ok) NX.toast('Il manque ' + r.need + ' crédits', 'bad'); else { NX.toast(r.refund + ' points rendus', 'good'); talents(cls); draw(); } }),
       btn('← Menu', 'sm', () => menu())
     );
@@ -242,46 +250,67 @@
     show(wrap);
 
     const ctx = cv.getContext('2d');
-    let cam = { x: 0, y: 0, z: 0.7 }, drag = null, sel = null;
-    function resize() { const r = body.getBoundingClientRect(); cv.width = r.width; cv.height = r.height; draw(); }
-    setTimeout(resize, 0);
-    window.addEventListener('resize', resize);
-    NX.bus.on('talent:alloc', () => { draw(); top.querySelector('.points').textContent = P.d.points + ' pts'; });
+    let cam = { x: 0, y: 0, z: 0.8 }, drag = null, sel = null, hover = null, cw = 0, ch = 0, fitted = false;
 
-    function W2S(p) { return { x: cv.width / 2 + (p.x + cam.x) * cam.z, y: cv.height / 2 + (p.y + cam.y) * cam.z }; }
-    function S2W(x, y) { return { x: (x - cv.width / 2) / cam.z - cam.x, y: (y - cv.height / 2) / cam.z - cam.y }; }
+    function W2S(p) { return { x: cw / 2 + (p.x + cam.x) * cam.z, y: ch / 2 + (p.y + cam.y) * cam.z }; }
+    function S2W(x, y) { return { x: (x - cw / 2) / cam.z - cam.x, y: (y - ch / 2) / cam.z - cam.y }; }
+    function nodeR(n) { return (n.kind === 'key' ? 21 : n.kind === 'notable' ? 15 : 12) * M.clamp(cam.z, 0.45, 1.4); }
+
+    function bounds() {
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      NX.TALENTS.all.forEach(id => { const p = nd[id].pos; if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; });
+      return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
+    }
+    function fit() {
+      const b = bounds();
+      const z = M.clamp(Math.min(cw / (b.w + 180), ch / (b.h + 180)), 0.38, 1.15);
+      cam.x = -b.cx; cam.y = -b.cy; cam.z = z;
+    }
+    function resize() {
+      const r = body.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      cw = Math.max(1, r.width); ch = Math.max(1, r.height);
+      cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+      cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (!fitted) { fit(); fitted = true; }
+      draw();
+    }
+    setTimeout(resize, 0);
 
     function alloc() { return cls === 'core' ? P.d.talents.core : Object.assign({}, P.d.talents.core, P.d.talents.byClass[cls] || {}); }
 
     function draw() {
       const allocSet = {};
       Object.assign(allocSet, P.d.talents.core); Object.assign(allocSet, P.d.talents.byClass[cls] || {});
-      ctx.clearRect(0, 0, cv.width, cv.height);
-      const g = ctx.createLinearGradient(0, 0, cv.width, cv.height);
+      ctx.clearRect(0, 0, cw, ch);
+      const g = ctx.createLinearGradient(0, 0, cw, ch);
       g.addColorStop(0, '#05080e'); g.addColorStop(1, '#0a0f18');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
       ctx.save();
-      ctx.strokeStyle = 'rgba(57,230,255,0.06)'; ctx.lineWidth = 1;
-      const cell = 56, t = Date.now() * 0.0008;
-      const ox = ((t * 16) % cell), oy = ((t * 10) % cell);
+      ctx.strokeStyle = 'rgba(57,230,255,0.055)'; ctx.lineWidth = 1;
+      const cell = 56 * M.clamp(cam.z, 0.5, 1.5);
+      const gx = ((cw / 2 + cam.x * cam.z) % cell), gy = ((ch / 2 + cam.y * cam.z) % cell);
       ctx.beginPath();
-      for (let x = ox; x < cv.width; x += cell) { ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); }
-      for (let y = oy; y < cv.height; y += cell) { ctx.moveTo(0, y); ctx.lineTo(cv.width, y); }
+      for (let x = gx; x < cw; x += cell) { ctx.moveTo(x, 0); ctx.lineTo(x, ch); }
+      for (let y = gy; y < ch; y += cell) { ctx.moveTo(0, y); ctx.lineTo(cw, y); }
       ctx.stroke();
       ctx.restore();
+      const selCol = (() => { const n = sel ? nd[sel] : null; return n ? (n.cls === 'core' ? '#8fb8ff' : (NX.CLASSES[n.cls] ? NX.CLASSES[n.cls].col : colorOfX(n.cls))) : '#fff'; })();
       // liens entre nœuds (courbes légères)
       NX.TALENTS.all.forEach(id => {
         const n = nd[id];
         n.req.forEach(rq => {
           const a = W2S(n.pos), b = W2S(nd[rq].pos);
           const on = allocSet[id] && allocSet[rq];
+          const litEdge = sel === id || sel === rq;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
           const dx = b.x - a.x, dy = b.y - a.y;
           ctx.quadraticCurveTo(mx - dy * 0.14, my + dx * 0.14, b.x, b.y);
-          ctx.strokeStyle = on ? '#39e6ff' : 'rgba(120,150,190,0.14)';
-          ctx.lineWidth = on ? 4 : 2;
+          ctx.strokeStyle = on ? '#39e6ff' : (litEdge ? M.rgba(selCol, 0.5) : 'rgba(120,150,190,0.14)');
+          ctx.lineWidth = on ? 4 : (litEdge ? 2.5 : 2);
           ctx.stroke();
         });
       });
@@ -289,15 +318,15 @@
       NX.TALENTS.all.forEach(id => {
         const n = nd[id], p = W2S(n.pos);
         const owned = allocSet[id], can = P.canTake(cls, id);
-        const baseR = (n.kind === 'key' ? 19 : n.kind === 'notable' ? 14 : 11) * Math.max(0.5, Math.min(1.5, cam.z));
+        const baseR = nodeR(n);
         const col = n.cls === 'core' ? '#8fb8ff' : (NX.CLASSES[n.cls] ? NX.CLASSES[n.cls].col : (colorOfX(n.cls)));
-        // halo de nœud actif ou sélectionnable
-        if (owned || can) {
+        // halo de nœud actif, survolé ou sélectionnable
+        if (owned || can || sel === id || hover === id) {
           ctx.save();
           ctx.shadowColor = col; ctx.shadowBlur = owned ? 20 : 12;
           ctx.globalAlpha = owned ? 1 : 0.92;
           ctx.beginPath(); ctx.arc(p.x, p.y, baseR + 8, 0, M.TAU);
-          ctx.fillStyle = M.rgba(col, 0.14); ctx.fill();
+          ctx.fillStyle = M.rgba(col, sel === id ? 0.24 : 0.14); ctx.fill();
           ctx.restore();
         }
         // anneau de sélection
@@ -309,46 +338,81 @@
         // corps du nœud
         ctx.beginPath(); ctx.arc(p.x, p.y, baseR, 0, M.TAU);
         ctx.fillStyle = owned ? col : 'rgba(10,17,28,0.94)';
-        ctx.globalAlpha = owned ? 1 : (can ? 0.97 : 0.32);
+        ctx.globalAlpha = owned ? 1 : (can ? 0.97 : (sel === id || hover === id ? 0.8 : 0.34));
         ctx.fill(); ctx.globalAlpha = 1;
-        ctx.strokeStyle = owned ? '#ffffff' : (can ? col : 'rgba(90,110,140,0.55)');
+        ctx.strokeStyle = owned ? '#ffffff' : (can ? col : 'rgba(120,145,180,0.6)');
         ctx.lineWidth = owned ? 3.5 : (can ? 3 : 2); ctx.stroke();
         // icône au centre (émoji) ou ★ pour les clés sans icône
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         if (n.ic) {
-          ctx.font = (baseR * 1.45) + 'px sans-serif';
+          ctx.font = (baseR * 1.35) + 'px "Segoe UI Emoji","Apple Color Emoji",sans-serif';
           ctx.fillStyle = owned ? '#fff' : '#eaf3ff';
           ctx.fillText(n.ic, p.x, p.y + baseR * 0.06);
         } else if (n.kind === 'key') {
-          ctx.font = 'bold ' + (baseR * 1.25) + 'px sans-serif';
+          ctx.font = 'bold ' + (baseR * 1.2) + 'px sans-serif';
           ctx.fillStyle = owned ? '#000' : col;
           ctx.fillText('★', p.x, p.y + baseR * 0.06);
         }
         // petit badge coût en bas à droite du nœud
         const cr = baseR * 0.5;
         ctx.beginPath(); ctx.arc(p.x + baseR - cr, p.y + baseR - cr, cr, 0, M.TAU);
-        ctx.fillStyle = owned ? 'rgba(255,255,255,0.15)' : (can ? '#ffd479' : 'rgba(90,110,140,0.45)');
+        ctx.fillStyle = owned ? 'rgba(255,255,255,0.15)' : (can ? '#ffd479' : 'rgba(90,110,140,0.5)');
         ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.stroke();
         ctx.font = (cr * 1.1) + 'px Consolas, monospace';
-        ctx.fillStyle = owned ? '#8fa3bd' : (can ? '#1a1a1a' : 'rgba(255,255,255,0.6)');
+        ctx.fillStyle = owned ? '#8fa3bd' : (can ? '#1a1a1a' : 'rgba(255,255,255,0.62)');
         ctx.fillText(n.cost, p.x + baseR - cr, p.y + baseR - cr + cr * 0.32);
+        // étiquette du nom pour les notables/clés quand on est assez zoomé
+        if (cam.z > 0.95 && n.kind !== 'minor') {
+          ctx.font = '10px "Segoe UI",sans-serif'; ctx.fillStyle = owned ? '#dff0ff' : '#9fb4cc';
+          ctx.fillText(n.n, p.x, p.y + baseR + 11);
+        }
       });
     }
     function colorOfX(sc) { return sc.startsWith('x') ? '#c48bff' : '#8aa0b8'; }
 
     function nodeAt(mx, my) {
-      let best = null, bd = 24;
-      NX.TALENTS.all.forEach(id => { const p = W2S(nd[id].pos), d = M.dist(p.x, p.y, mx, my); if (d < bd) { bd = d; best = id; } });
+      let best = null, bd = 16;
+      NX.TALENTS.all.forEach(id => {
+        const p = W2S(nd[id].pos), d = M.dist(p.x, p.y, mx, my), hit = Math.max(16, nodeR(nd[id]));
+        if (d < hit && hit > bd - 1) { bd = Math.max(bd, hit); best = id; }
+      });
       return best;
     }
-    cv.addEventListener('mousedown', e => { const r = cv.getBoundingClientRect(); drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; });
-    window.addEventListener('mouseup', e => {
+    const onDown = e => { const r = cv.getBoundingClientRect(); drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; };
+    const onUp = e => {
       if (!drag) return; const moved = drag.moved; drag = null; if (moved) return;
-      const r = cv.getBoundingClientRect(); const id = nodeAt(e.clientX - r.left, e.clientY - r.top); if (id) { sel = id; showInfo(id); }
-    });
-    cv.addEventListener('mousemove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true; cam.x = drag.cx + dx / cam.z; cam.y = drag.cy + dy / cam.z; draw(); });
-    cv.addEventListener('wheel', e => { e.preventDefault(); cam.z = M.clamp(cam.z * (e.deltaY < 0 ? 1.12 : 0.89), 0.28, 2.2); draw(); }, { passive: false });
+      const r = cv.getBoundingClientRect(); const id = nodeAt(e.clientX - r.left, e.clientY - r.top); if (id) { sel = id; showInfo(id); draw(); }
+    };
+    const onMove = e => {
+      const r = cv.getBoundingClientRect();
+      if (drag) {
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+        cam.x = drag.cx + dx / cam.z; cam.y = drag.cy + dy / cam.z; draw();
+      } else {
+        const h = nodeAt(e.clientX - r.left, e.clientY - r.top);
+        if (h !== hover) { hover = h; cv.style.cursor = h ? 'pointer' : 'grab'; draw(); }
+      }
+    };
+    const onWheel = e => {
+      e.preventDefault();
+      const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      const before = S2W(mx, my);
+      cam.z = M.clamp(cam.z * (e.deltaY < 0 ? 1.12 : 0.89), 0.3, 2.4);
+      cam.x = (mx - cw / 2) / cam.z - before.x;
+      cam.y = (my - ch / 2) / cam.z - before.y;
+      draw();
+    };
+    cv.addEventListener('mousedown', onDown);
+    cv.addEventListener('mousemove', onMove);
+    cv.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('resize', resize);
+    const offAlloc = NX.bus.on('talent:alloc', () => { draw(); const pt = top.querySelector('.points'); if (pt) pt.textContent = P.d.points + ' pts'; });
+    const offRespec = NX.bus.on('talent:respec', () => draw());
+    if (tCleanup) { try { tCleanup(); } catch (e) {} }
+    tCleanup = () => { window.removeEventListener('mouseup', onUp); window.removeEventListener('resize', resize); offAlloc(); offRespec(); };
 
     function showInfo(id) {
       const n = nd[id], owned = P.isAllocated(NX.scopeOf(id), id), can = P.canTake(cls, id);
@@ -603,12 +667,14 @@
     const info = run.finishInfo();
     const win = info.win;
     const points = win ? (3 + run.level.act * 2 + (run.nightmare ? 3 : 0)) : 1;
-    const credits = win ? run.level.reward.credits + run.goldRun : run.goldRun;
+    const prime = Math.round(run.time * 0.5) + run.kills * 2;
+    const credits = (win ? run.level.reward.credits : 0) + run.goldRun + prime;
     const xp = (win ? run.level.reward.xp : 0) + Math.round(run.xpRun * 0.4) + Math.round(run.time * 0.6);
     P.recordRun({ cls: run.cls, level: run.level.i, reached: run.level.i, win, time: run.time, kills: run.kills, bossKills: run.bossKills, credits, xp, points, score: run.score });
     if (win) P.clearLevel(run.level.i, run.cls);
     NX.net.submitScore({ name: P.d.user.name, cls: run.cls, reached: run.level.i, score: run.score, time: run.time });
 
+    const d = P.d;
     const body = h('div', { style: 'max-width:820px;margin:0 auto;text-align:center' },
       h('h2', { class: 'sect', style: 'color:' + (win ? '#4dff9f' : '#ff5d6c') }, win ? 'NIVEAU ' + run.level.i + ' VALIDÉ' : 'PROCESSUS TERMINÉ'),
       h('div', { class: 'card', style: 'text-align:left' },
@@ -618,7 +684,18 @@
           h('div', { class: 'k' }, 'Éliminations'), h('div', {}, run.kills + ' (dont ' + run.bossKills + ' boss)'),
           h('div', { class: 'k' }, 'Niveau du héros'), h('div', {}, run.player.level),
           h('div', { class: 'k' }, 'Score'), h('div', {}, M.fmt(run.score)),
-          h('div', { class: 'k' }, 'Récompenses'), h('div', {}, '+₡ ' + M.fmt(credits) + '  ·  +' + M.fmt(xp) + ' XP  ·  +' + points + ' point(s) de talent')
+          h('div', { class: 'k' }, 'Butin ramassé'), h('div', {}, '₡ ' + M.fmt(run.goldRun) + ' en run'),
+          h('div', { class: 'k' }, 'Prime de mission'), h('div', {}, '₡ ' + M.fmt(prime)),
+          h('div', { class: 'k' }, 'Récompenses'), h('div', { style: 'color:#ffd479;font-weight:600' }, '+₡ ' + M.fmt(credits) + '  ·  +' + M.fmt(xp) + ' XP  ·  +' + points + ' point(s) de talent')
+        )
+      ),
+      h('div', { class: 'card', style: 'margin-top:14px' },
+        h('h3', {}, 'Bourse : ₡ ' + M.fmt(d.credits) + '  ·  ' + d.points + ' point(s) de talent'),
+        h('div', { class: 'mut' }, 'Dépense tes Crédits pour progresser entre les runs (objets, forge, points de talent).'),
+        h('div', { class: 'row wrap', style: 'justify-content:center;margin-top:12px' },
+          d.unlocks.talents ? btn('Arbre de talents', '', () => talents(NX.state.cls)) : null,
+          d.unlocks.shop ? btn('Marchand', '', () => shop()) : null,
+          d.unlocks.forge ? btn('Forgeron', '', () => forge()) : null
         )
       )
     );

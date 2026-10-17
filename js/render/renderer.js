@@ -313,6 +313,36 @@
     ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(s.x, s.y + 15, 14, 5, 0, 0, TAU); ctx.fill(); ctx.restore();
     const frame = Math.floor(p.anim * 8) % 8;
     drawSprite({ x: p.x, y: p.y, r: p.r, id: 'raz' }, 'raz', '#7ff0ff', '#39e6ff', frame, 1, p.hitFlash > 0 ? 0.6 : 0, true);
+
+    // ---- barre de vie collée au personnage ----
+    const pct = M.clamp(p.hp / p.maxHp, 0, 1);
+    const bw = 56, bh = 7;
+    const bx = s.x - bw / 2, by = s.y - p.r * 2.25 - bh - 7;
+    ctx.save();
+    ctx.fillStyle = 'rgba(3,7,13,0.9)';
+    ART.rr(ctx, bx - 2, by - 2, bw + 4, bh + 4, 4); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ART.rr(ctx, bx, by, bw, bh, 3); ctx.fill();
+    if (pct > 0) {
+      const hpcol = pct > 0.5 ? '#4dff9f' : pct > 0.25 ? '#ffd479' : '#ff5d6c';
+      const gg = ctx.createLinearGradient(0, by, 0, by + bh);
+      gg.addColorStop(0, M.mix(hpcol, '#ffffff', 0.45)); gg.addColorStop(1, hpcol);
+      ctx.fillStyle = gg;
+      ART.rr(ctx, bx, by, Math.max(2, bw * pct), bh, 3); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(180,220,255,0.7)'; ctx.lineWidth = 1;
+    ART.rr(ctx, bx - 0.5, by - 0.5, bw + 1, bh + 1, 4); ctx.stroke();
+    // valeur de PV
+    ctx.font = 'bold 9px Consolas, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#d7e8ff'; ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+    ctx.fillText(Math.max(0, Math.ceil(p.hp)) + ' / ' + Math.ceil(p.maxHp), s.x, by - 4);
+    ctx.shadowBlur = 0;
+    // pastille de niveau du héros à gauche de la barre
+    ctx.fillStyle = '#39e6ff'; ctx.beginPath(); ctx.arc(bx - 11, by + bh / 2, 8, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#04121c'; ctx.font = 'bold 10px Consolas, monospace';
+    ctx.fillText(p.level, bx - 11, by + bh / 2 + 3.5);
+    ctx.restore();
+
     if (p.stunT > 0) { ctx.save(); ctx.globalAlpha = 0.8; ctx.fillStyle = '#ccd6e0'; ctx.font = '16px sans-serif'; ctx.fillText('⛔', s.x - 8, s.y - 40); ctx.restore(); }
   }
 

@@ -90,9 +90,14 @@ summon, teleport, laser, shield, homing, healer). Chaque monstre combine 1–3 p
 - **Tronc commun** (obligatoire, garanti pour tous) : PV, dégâts globaux, vitesse, gain de Data,
   gain de Crédits, régén. Personne ne peut « rater » ces upgrades de progression de base.
 - **6 branches de classe** + **4 branches transversales** (Crit, Zone, Vitesse de projetiles, Défense).
-- **193 nœuds** : *mineurs* (petits bonus, 1 point), *notables* (effets marquants, 1–2 points),
+- **104 nœuds** : *mineurs* (petits bonus, 1 point), *notables* (effets marquants, 1–2 points),
   *keystones* (changent la façon de jouer, 3 points, choix exclusifs).
 - Le **respec** coûte des Crédits. Tu ne pourras **jamais tout prendre** : on spécialise.
+- **Monnaie unique : les Crédits.** Gagnés à chaque run (butin ramassé + prime de mission,
+  même en cas d'échec), dépensés chez le **Marchand**, au **Forgeron**, pour le **respec**, ou
+  **convertis en points de talent** (150 ₡ = 1 point) directement dans l'arbre. Les points
+  viennent aussi des niveaux de compte et des victoires. Talents, Marchand et Forgeron
+  s'ouvrent dès la première run terminée.
 
 Exemples de keystones qui changent le build :
 - *Récursivité* : +50 % dégâts de zone, −30 % dégâts mono-cible.

@@ -116,7 +116,8 @@
     } else if (refs._bname) { NX.clear(refs.boss); refs._bname = null; }
 
     refs.right.innerHTML = '';
-    refs.right.appendChild(h('div', {}, '₡ ' + M.short(NX.profile.d.credits) + ' (compte)'));
+    refs.right.appendChild(h('div', { style: 'color:#ffd479;font-weight:600' }, '₡ ' + M.short(run.goldRun) + ' butin'));
+    refs.right.appendChild(h('div', { class: 'mut' }, '₡ ' + M.short(NX.profile.d.credits) + ' compte'));
     refs.right.appendChild(h('div', { class: 'mut' }, 'MODE ' + (run.nightmare ? 'CAUCHEMAR' : 'NORMAL')));
   }
 
